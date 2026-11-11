@@ -3,14 +3,14 @@
 # O código da API e dos pacotes internos é empacotado em um único main.js (esbuild).
 # Variáveis obrigatórias em execução: SUPABASE_URL e SUPABASE_ANON_KEY (a API não usa service_role).
 
-FROM node:24.22.1-alpine AS build
+FROM node:26.13.0-alpine AS build
 WORKDIR /repo
 RUN npm install -g pnpm@12.18.0
 COPY . .
 RUN pnpm install --frozen-lockfile --filter "@compara/api..." \
  && pnpm --filter @compara/api build
 
-FROM node:24.22.1-alpine AS runtime
+FROM node:26.13.0-alpine AS runtime
 ENV NODE_ENV=production \
     API_HOST=0.0.0.0 \
     API_PORT=4000
