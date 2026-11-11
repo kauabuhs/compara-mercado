@@ -1,0 +1,12 @@
+{
+  "name": "@compara/config",
+  "version": "0.0.0",
+  "private": true,
+  "description": "tsconfig compartilhados do monorepo",
+  "files": [
+    "tsconfig.base.json",
+    "tsconfig.lib.json",
+    "tsconfig.next.json",
+    "tsconfig.node.json"
+  ]
+}

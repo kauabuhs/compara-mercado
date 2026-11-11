@@ -1,0 +1,21 @@
+{
+  "name": "@compara/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Contratos entre o front-end e o servidor: modelos de leitura e entradas validadas. Não conhece banco, Supabase nem regras internas.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@compara/config": "workspace:*",
+    "vitest": "^5.1.0"
+  }
+}
