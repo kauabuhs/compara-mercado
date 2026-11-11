@@ -32,6 +32,10 @@ O front-end só funciona com a API no ar (ele não acessa o banco). Worker (opci
 | Páginas com erro "API do back-end está indisponível"       | API não está rodando (ou `API_URL` errada)      | `pnpm dev:api` e confira `API_URL` em `frontend/.env.local`                                                                 |
 | Porta ocupada no e2e (3100/4100)                           | servidor de teste de uma execução anterior      | encerre o processo que segura a porta e rode de novo                                                                        |
 
+## Login local (link mágico)
+
+O login é por e-mail sem senha. Localmente os e-mails caem no **Mailpit**: http://127.0.0.1:54324 (sobe junto com `pnpm db:start`; se você usou `-x inbucket`, o login não completa). Entre com `admin@local.test`, abra o e-mail e clique no link: ele volta para `http://localhost:3000/auth/callback`. Isso depende de `site_url` e `additional_redirect_urls` em `backend/supabase/config.toml` apontarem para `localhost:3000`; depois de mudá-los, reinicie o Supabase (`db:stop` + `db:start`). Acesse sempre por `localhost`, não `127.0.0.1`: o cookie do PKCE é por host.
+
 ## Dados de teste
 
 `backend/supabase/seed.sql` cria 1 cidade piloto, 6 mercados fictícios, 48 produtos e 265 preços com datas e promoções variadas, mais o admin `admin@local.test`. **Nunca roda em staging/produção.**
