@@ -19,7 +19,7 @@ O navegador não conhece a URL da API nem o token. A proteção de rota no front
 | Método e rota                            | Acesso  | Entrada                                  | Saída                      | Observações                                                                |
 | ---------------------------------------- | ------- | ---------------------------------------- | -------------------------- | -------------------------------------------------------------------------- |
 | `GET /healthz`                           | público | —                                        | `{ status: "ok" }`         | sonda de saúde                                                             |
-| `GET /v1/products/search`                | público | `q` (2–80), `limit` (1–50, padrão 30)    | `{ hits: ProductHit[] }`   | tolera erro de digitação; cache 60 s                                       |
+| `GET /v1/products/search`                | público | `q` (2–80), `limit` (1–50, padrão 30)    | `{ hits: ProductHit[] }`   | tolera erro de digitação (word_similarity ≥ 0,5) e acento; cache 60 s      |
 | `GET /v1/products/:productId`            | público | uuid                                     | `ProductDetails`           | preços com `ageDays` e `freshness`; 404 se não existe; cache 60 s          |
 | `GET /v1/offers`                         | público | `storeId?`, `limit` (1–100, padrão 60)   | `{ offers: PriceOffer[] }` | só promoções vigentes; cache 60 s                                          |
 | `GET /v1/stores`                         | público | `cityId?`                                | `{ stores: Store[] }`      | cache 5 min                                                                |
