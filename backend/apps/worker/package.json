@@ -1,0 +1,31 @@
+{
+  "name": "@compara/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Ingestão e jobs agendados: lê arquivos de preço com IA, normaliza, casa produtos e publica ou envia à revisão.",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "build": "esbuild src/main.ts --bundle --platform=node --format=esm --target=node24 --external:pg-native --banner:js=\"import{createRequire}from'node:module';const require=createRequire(import.meta.url);\" --outfile=dist/main.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@compara/ai": "workspace:*",
+    "@compara/db": "workspace:*",
+    "@compara/domain": "workspace:*",
+    "@compara/ingest": "workspace:*",
+    "@supabase/supabase-js": "^2.118.0",
+    "pg-boss": "^12.38.0",
+    "pino": "^10.4.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@compara/config": "workspace:*",
+    "@types/node": "^24.19.2",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.15",
+    "vitest": "^5.1.0"
+  }
+}
