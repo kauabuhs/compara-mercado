@@ -271,6 +271,9 @@ const WORKER_INFRASTRUCTURE_FILES = new Set([
 for (const [filePath, fileImports] of imports) {
   const isWorkerFile = filePath.startsWith("backend/apps/worker/src/");
   if (!isWorkerFile || WORKER_INFRASTRUCTURE_FILES.has(filePath)) continue;
+  // Teste de integração liga a infraestrutura real (Postgres/Storage) de propósito: é onde se
+  // valida o adaptador. Só ele é isento; o código de produção do pipeline segue sem infra.
+  if (filePath.endsWith("/integration.test.ts")) continue;
   for (const { specifier, local } of fileImports) {
     const isInfrastructure =
       /^(@supabase\/|pg-boss)/.test(specifier) ||
