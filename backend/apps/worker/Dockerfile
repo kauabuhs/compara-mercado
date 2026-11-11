@@ -3,14 +3,14 @@
 # O código do worker e dos pacotes internos é empacotado em um único main.js (esbuild),
 # então a imagem final não precisa de node_modules nem do código-fonte.
 
-FROM node:24.22.1-alpine AS build
+FROM node:26.13.0-alpine AS build
 WORKDIR /repo
 RUN npm install -g pnpm@12.18.0
 COPY . .
 RUN pnpm install --frozen-lockfile --filter "@compara/worker..." \
  && pnpm --filter @compara/worker build
 
-FROM node:24.22.1-alpine AS runtime
+FROM node:26.13.0-alpine AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build /repo/backend/apps/worker/dist/main.js ./main.js
