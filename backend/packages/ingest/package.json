@@ -1,0 +1,21 @@
+{
+  "name": "@compara/ingest",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Pipeline de coleta: normalização, casamento de produtos, validação de sanidade e decisão de publicação. Funções puras.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@compara/domain": "workspace:*"
+  },
+  "devDependencies": {
+    "@compara/config": "workspace:*",
+    "vitest": "^5.1.0"
+  }
+}
