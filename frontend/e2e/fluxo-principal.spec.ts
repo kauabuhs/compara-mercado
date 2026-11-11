@@ -89,3 +89,33 @@ test("produto com id inválido devolve 404 amigável", async ({ page }) => {
   await page.goto("/produto/nao-e-uuid");
   await expect(page.getByText("Página não encontrada")).toBeVisible();
 });
+
+test("busca acha o produto mesmo com letras trocadas (leiet → Leite)", async ({ page }) => {
+  await page.goto("/busca?q=leiet");
+  await expect(page.getByRole("link", { name: /Leite integral/ })).toBeVisible();
+});
+
+test("o CSP autoriza a origem exata dos tiles do mapa (img-src e connect-src)", async ({
+  request,
+}) => {
+  // Regressão: o CSP permitia `*.tile.openstreetmap.org`, que NÃO casa com `tile.openstreetmap.org`
+  // (o curinga exige subdomínio). O mapa ficava sem tiles e nenhum erro aparecia na interface.
+  // Sem depender de WebGL: o Chromium headless do CI não renderiza o mapa.
+  const tileHost = "tile.openstreetmap.org";
+  const response = await request.get("/mercados");
+  const csp = response.headers()["content-security-policy"] ?? "";
+  const directive = (name: string) =>
+    csp
+      .split(";")
+      .map((part) => part.trim().split(/\s+/))
+      .find(([directiveName]) => directiveName === name)
+      ?.slice(1) ?? [];
+  const allows = (sources: string[]) =>
+    sources.some((source) => {
+      const host = source.replace("https://", "");
+      return host.startsWith("*.") ? tileHost.endsWith(host.slice(1)) : host === tileHost;
+    });
+
+  expect(allows(directive("img-src")), "img-src deve permitir os tiles").toBe(true);
+  expect(allows(directive("connect-src")), "connect-src deve permitir os tiles").toBe(true);
+});

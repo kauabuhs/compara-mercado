@@ -1,16 +1,15 @@
 import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV !== "production";
-const supabaseUrl = process.env["NEXT_PUBLIC_SUPABASE_URL"] ?? "";
 
 // CSP estática. Endurecimento futuro: nonce por requisição via proxy.ts (ver docs/adr/0003-seguranca-web.md).
 const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://*.tile.openstreetmap.org",
+  "img-src 'self' data: blob: https://tile.openstreetmap.org",
   "font-src 'self'",
-  `connect-src 'self' ${supabaseUrl} https://*.tile.openstreetmap.org${isDev ? " ws:" : ""}`,
+  `connect-src 'self' https://tile.openstreetmap.org${isDev ? " ws:" : ""}`,
   "worker-src 'self' blob:",
   "manifest-src 'self'",
   "object-src 'none'",
