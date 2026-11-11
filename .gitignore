@@ -1,0 +1,41 @@
+# dependências e builds
+node_modules/
+.pnpm-store/
+.next/
+.turbo/
+dist/
+build/
+coverage/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# ambiente e segredos — NUNCA versionar
+.env
+.env.*
+!.env.example
+
+# supabase local
+backend/supabase/.branches/
+backend/supabase/.temp/
+
+# testes
+playwright-report/
+test-results/
+blob-report/
+
+# editor / SO
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# vercel
+.vercel/

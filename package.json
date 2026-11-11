@@ -1,0 +1,45 @@
+{
+  "name": "compara-mercado",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Comparador de preços de supermercados — em qual mercado da minha cidade a minha lista sai mais barata hoje?",
+  "license": "UNLICENSED",
+  "packageManager": "pnpm@12.18.0",
+  "engines": {
+    "node": ">=24.22.1",
+    "pnpm": ">=12"
+  },
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "dev:frontend": "turbo run dev --filter=@compara/frontend",
+    "dev:api": "turbo run dev --filter=@compara/api",
+    "dev:worker": "turbo run dev --filter=@compara/worker",
+    "build": "turbo run build",
+    "build:frontend": "turbo run build --filter=@compara/frontend...",
+    "build:backend": "turbo run build --filter=./backend/**",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "typecheck": "turbo run typecheck",
+    "arch:check": "node scripts/check-architecture.mjs",
+    "test": "turbo run test",
+    "test:e2e": "turbo run test:e2e",
+    "check": "pnpm lint && pnpm arch:check && pnpm typecheck && pnpm test",
+    "db:start": "supabase start --workdir backend",
+    "db:stop": "supabase stop --workdir backend",
+    "db:reset": "supabase db reset --workdir backend",
+    "db:test": "supabase test db --workdir backend",
+    "db:types": "node scripts/gen-db-types.mjs",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.4",
+    "@commitlint/cli": "^21.2.4",
+    "@commitlint/config-conventional": "^21.2.4",
+    "@types/node": "^24.19.2",
+    "husky": "^9.1.7",
+    "supabase": "^3.0.0",
+    "turbo": "^2.11.10",
+    "typescript": "^7.0.2"
+  }
+}

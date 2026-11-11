@@ -1,0 +1,18 @@
+packages:
+  # frontend e backend são aplicações independentes; shared só tem contratos e config
+  - "frontend"
+  - "frontend/packages/*"
+  - "backend"
+  - "backend/apps/*"
+  - "backend/packages/*"
+  - "shared/*"
+
+# Endurecimento da cadeia de suprimentos (ver docs/adr/0002-supply-chain.md)
+# Só instala versões publicadas há 7 dias ou mais
+minimumReleaseAge: 10080
+# Bloqueia dependências transitivas vindas de git/tarball
+blockExoticSubdeps: true
+# Impede que uma atualização rebaixe as garantias de publicação (provenance)
+trustPolicy: no-downgrade
+allowBuilds:
+  esbuild: false
