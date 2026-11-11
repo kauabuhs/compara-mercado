@@ -1,0 +1,12 @@
+{
+  "name": "@compara/backend",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Back-end do Compara Mercado: API HTTP, worker de ingestão, pacotes de domínio e o projeto Supabase (backend/supabase).",
+  "scripts": {
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:test": "supabase test db"
+  }
+}
