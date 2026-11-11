@@ -133,14 +133,14 @@ isOneToOne: false
                   ]
                 },"price_observations": {
                   Row: {
-                    "approved_at": string | null,"approved_by": string | null,"confidence": number,"created_at": string,"created_by": string | null,"id": string,"observed_at": string,"price_cents": number,"product_id": string,"promo": boolean,"source": Database["public"]['Enums']["observation_source"],"source_id": string | null,"source_ref": string | null,"status": Database["public"]['Enums']["observation_status"],"store_id": string,"unit_price_cents": number,"valid_from": string | null,"valid_to": string | null
+                    "approved_at": string | null,"approved_by": string | null,"confidence": number,"created_at": string,"created_by": string | null,"id": string,"observed_at": string,"price_cents": number,"product_id": string,"promo": boolean,"reviewed_at": string | null,"reviewed_by": string | null,"source": Database["public"]['Enums']["observation_source"],"source_id": string | null,"source_ref": string | null,"status": Database["public"]['Enums']["observation_status"],"store_id": string,"unit_price_cents": number,"valid_from": string | null,"valid_to": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "approved_at"?: string | null,"approved_by"?: string | null,"confidence"?: number,"created_at"?: string,"created_by"?: string | null,"id"?: string,"observed_at"?: string,"price_cents": number,"product_id": string,"promo"?: boolean,"source": Database["public"]['Enums']["observation_source"],"source_id"?: string | null,"source_ref"?: string | null,"status"?: Database["public"]['Enums']["observation_status"],"store_id": string,"unit_price_cents": number,"valid_from"?: string | null,"valid_to"?: string | null
+                    "approved_at"?: string | null,"approved_by"?: string | null,"confidence"?: number,"created_at"?: string,"created_by"?: string | null,"id"?: string,"observed_at"?: string,"price_cents": number,"product_id": string,"promo"?: boolean,"reviewed_at"?: string | null,"reviewed_by"?: string | null,"source": Database["public"]['Enums']["observation_source"],"source_id"?: string | null,"source_ref"?: string | null,"status"?: Database["public"]['Enums']["observation_status"],"store_id": string,"unit_price_cents": number,"valid_from"?: string | null,"valid_to"?: string | null
                   }
                   Update: {
-                    "approved_at"?: string | null,"approved_by"?: string | null,"confidence"?: number,"created_at"?: string,"created_by"?: string | null,"id"?: string,"observed_at"?: string,"price_cents"?: number,"product_id"?: string,"promo"?: boolean,"source"?: Database["public"]['Enums']["observation_source"],"source_id"?: string | null,"source_ref"?: string | null,"status"?: Database["public"]['Enums']["observation_status"],"store_id"?: string,"unit_price_cents"?: number,"valid_from"?: string | null,"valid_to"?: string | null
+                    "approved_at"?: string | null,"approved_by"?: string | null,"confidence"?: number,"created_at"?: string,"created_by"?: string | null,"id"?: string,"observed_at"?: string,"price_cents"?: number,"product_id"?: string,"promo"?: boolean,"reviewed_at"?: string | null,"reviewed_by"?: string | null,"source"?: Database["public"]['Enums']["observation_source"],"source_id"?: string | null,"source_ref"?: string | null,"status"?: Database["public"]['Enums']["observation_status"],"store_id"?: string,"unit_price_cents"?: number,"valid_from"?: string | null,"valid_to"?: string | null
                   }
                   Relationships: [
                     {
@@ -160,6 +160,12 @@ isOneToOne: false
       columns: ["product_id"]
 isOneToOne: false
       referencedRelation: "products"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "price_observations_reviewed_by_fkey"
+      columns: ["reviewed_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "price_observations_source_id_fkey"
