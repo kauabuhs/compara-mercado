@@ -16,7 +16,7 @@
     "@compara/db": "workspace:*",
     "@compara/domain": "workspace:*",
     "@hono/node-server": "^2.1.6",
-    "@supabase/supabase-js": "^2.118.0",
+    "@supabase/supabase-js": "^2.119.0",
     "hono": "^4.13.16",
     "pino": "^10.4.0",
     "zod": "^4.6.7"
