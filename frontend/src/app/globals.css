@@ -1,0 +1,3 @@
+@import "@compara/ui/styles.css";
+@import "maplibre-gl/dist/maplibre-gl.css";
+@source "../../packages/ui/src";

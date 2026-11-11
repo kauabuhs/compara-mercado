@@ -1,0 +1,146 @@
+/*
+ * Design tokens do Compara Mercado (Tailwind v4).
+ * Claro/escuro automáticos pelo sistema; o usuário pode forçar com <html data-theme="light|dark">.
+ * Contraste conferido para WCAG AA (texto >= 4.5:1).
+ */
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root {
+  --background: oklch(0.99 0.002 106);
+  --surface: oklch(1 0 0);
+  --surface-muted: oklch(0.965 0.004 106);
+  --foreground: oklch(0.2 0.01 260);
+  --muted-foreground: oklch(0.46 0.012 260);
+  --border: oklch(0.915 0.006 260);
+  --ring: oklch(0.55 0.15 155);
+
+  --brand: oklch(0.5 0.13 155);
+  --brand-foreground: oklch(0.99 0 0);
+  --brand-soft: oklch(0.95 0.04 155);
+  --brand-soft-foreground: oklch(0.36 0.09 155);
+
+  --warning-soft: oklch(0.96 0.06 85);
+  --warning-soft-foreground: oklch(0.4 0.09 70);
+  --danger: oklch(0.52 0.19 27);
+  --danger-soft: oklch(0.96 0.03 27);
+
+  --radius: 1rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: oklch(0.17 0.008 260);
+    --surface: oklch(0.21 0.01 260);
+    --surface-muted: oklch(0.25 0.01 260);
+    --foreground: oklch(0.96 0.003 106);
+    --muted-foreground: oklch(0.72 0.01 260);
+    --border: oklch(0.31 0.012 260);
+    --ring: oklch(0.72 0.15 155);
+
+    --brand: oklch(0.72 0.15 155);
+    --brand-foreground: oklch(0.18 0.02 155);
+    --brand-soft: oklch(0.3 0.06 155);
+    --brand-soft-foreground: oklch(0.9 0.06 155);
+
+    --warning-soft: oklch(0.32 0.05 80);
+    --warning-soft-foreground: oklch(0.92 0.07 85);
+    --danger: oklch(0.72 0.17 25);
+    --danger-soft: oklch(0.3 0.06 25);
+  }
+}
+
+[data-theme="dark"] {
+  --background: oklch(0.17 0.008 260);
+  --surface: oklch(0.21 0.01 260);
+  --surface-muted: oklch(0.25 0.01 260);
+  --foreground: oklch(0.96 0.003 106);
+  --muted-foreground: oklch(0.72 0.01 260);
+  --border: oklch(0.31 0.012 260);
+  --ring: oklch(0.72 0.15 155);
+
+  --brand: oklch(0.72 0.15 155);
+  --brand-foreground: oklch(0.18 0.02 155);
+  --brand-soft: oklch(0.3 0.06 155);
+  --brand-soft-foreground: oklch(0.9 0.06 155);
+
+  --warning-soft: oklch(0.32 0.05 80);
+  --warning-soft-foreground: oklch(0.92 0.07 85);
+  --danger: oklch(0.72 0.17 25);
+  --danger-soft: oklch(0.3 0.06 25);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-soft-foreground: var(--brand-soft-foreground);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-soft-foreground: var(--warning-soft-foreground);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+
+  --radius-xl: var(--radius);
+  --radius-2xl: calc(var(--radius) + 0.5rem);
+  --radius-3xl: calc(var(--radius) + 1rem);
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "SF Pro Text", "Segoe UI", Inter, Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -12px rgb(0 0 0 / 0.12);
+  --animate-fade-in: fade-in 200ms ease-out both;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@layer base {
+  html {
+    color-scheme: light dark;
+    -webkit-text-size-adjust: 100%;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+  }
+  body {
+    background: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+  /* Respeita a preferência de movimento reduzido */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      /* biome-ignore lint/complexity/noImportantStyles: padrão para movimento reduzido (a11y) */
+      animation-duration: 0.01ms !important;
+      /* biome-ignore lint/complexity/noImportantStyles: padrão para movimento reduzido (a11y) */
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
