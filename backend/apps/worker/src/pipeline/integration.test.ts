@@ -35,8 +35,10 @@ function dayFromNow(days: number): string {
 }
 
 describe.skipIf(!url || !serviceKey)("pipeline contra o Postgres real", () => {
-  const db = createServiceClient(url ?? "", serviceKey ?? "");
-  const repo = new SupabasePipelineRepo(db);
+  // describe.skipIf AINDA executa este corpo (só pula os testes): criar o cliente aqui, sem as
+  // variáveis, lançaria "supabaseUrl is required" e derrubaria o CI. Por isso é criado no beforeAll.
+  let db: ReturnType<typeof createServiceClient>;
+  let repo: SupabasePipelineRepo;
   const log = createLogger("fatal");
   const runId = `qa-${Date.now()}`;
   const sha256 = createHash("sha256").update(randomUUID()).digest("hex");
@@ -113,6 +115,8 @@ describe.skipIf(!url || !serviceKey)("pipeline contra o Postgres real", () => {
   };
 
   beforeAll(async () => {
+    db = createServiceClient(url ?? "", serviceKey ?? "");
+    repo = new SupabasePipelineRepo(db);
     const { data: store } = await db
       .from("stores")
       .select("id")
