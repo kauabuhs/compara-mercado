@@ -16,20 +16,20 @@ O navegador não conhece a URL da API nem o token. A proteção de rota no front
 
 ## Endpoints (v1)
 
-| Método e rota                            | Acesso  | Entrada                                  | Saída                      | Observações                                                                |
-| ---------------------------------------- | ------- | ---------------------------------------- | -------------------------- | -------------------------------------------------------------------------- |
-| `GET /healthz`                           | público | —                                        | `{ status: "ok" }`         | sonda de saúde                                                             |
-| `GET /v1/products/search`                | público | `q` (2–80), `limit` (1–50, padrão 30)    | `{ hits: ProductHit[] }`   | tolera erro de digitação (word_similarity ≥ 0,5) e acento; cache 60 s      |
-| `GET /v1/products/:productId`            | público | uuid                                     | `ProductDetails`           | preços com `ageDays` e `freshness`; 404 se não existe; cache 60 s          |
-| `GET /v1/offers`                         | público | `storeId?`, `limit` (1–100, padrão 60)   | `{ offers: PriceOffer[] }` | só promoções vigentes; cache 60 s                                          |
-| `GET /v1/stores`                         | público | `cityId?`                                | `{ stores: Store[] }`      | cache 5 min                                                                |
-| `POST /v1/shopping-lists/compare`        | público | `CompareListRequest`                     | `ListComparison`           | **30 req/min por IP** (429 + `Retry-After`); a localização nunca é gravada |
-| `GET /v1/me`                             | token   | —                                        | `SessionUser`              | papel lido do banco; `Cache-Control: no-store`                             |
-| `GET /v1/admin/overview`                 | admin   | —                                        | `AdminOverview`            |                                                                            |
-| `GET /v1/admin/price-form-options`       | admin   | —                                        | `PriceFormOptions`         |                                                                            |
-| `GET /v1/admin/review-queue`             | admin   | —                                        | `{ observations }`         | até 50 pendentes                                                           |
-| `POST /v1/admin/prices`                  | admin   | `ManualPriceRequest` (centavos)          | `201 { ok: true }`         | grava `source=manual`, `approved`, atualiza `current_prices`               |
-| `POST /v1/admin/observations/:id/review` | admin   | `{ decision: "approved" \| "rejected" }` | `{ ok: true }`             | só observações `pending`                                                   |
+| Método e rota                            | Acesso  | Entrada                                  | Saída                      | Observações                                                                                                               |
+| ---------------------------------------- | ------- | ---------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `GET /healthz`                           | público | —                                        | `{ status: "ok" }`         | sonda de saúde                                                                                                            |
+| `GET /v1/products/search`                | público | `q` (2–80), `limit` (1–50, padrão 30)    | `{ hits: ProductHit[] }`   | tolera erro de digitação (word_similarity ≥ 0,5) e acento; cache 60 s                                                     |
+| `GET /v1/products/:productId`            | público | uuid                                     | `ProductDetails`           | preços com `ageDays` e `freshness`; 404 se não existe; cache 60 s                                                         |
+| `GET /v1/offers`                         | público | `storeId?`, `limit` (1–100, padrão 60)   | `{ offers: PriceOffer[] }` | só promoções vigentes; cache 60 s                                                                                         |
+| `GET /v1/stores`                         | público | `cityId?`                                | `{ stores: Store[] }`      | cache 5 min                                                                                                               |
+| `POST /v1/shopping-lists/compare`        | público | `CompareListRequest`                     | `ListComparison`           | **30 req/min por IP** (429 + `Retry-After`); a localização nunca é gravada                                                |
+| `GET /v1/me`                             | token   | —                                        | `SessionUser`              | papel lido do banco; `Cache-Control: no-store`                                                                            |
+| `GET /v1/admin/overview`                 | admin   | —                                        | `AdminOverview`            |                                                                                                                           |
+| `GET /v1/admin/price-form-options`       | admin   | —                                        | `PriceFormOptions`         |                                                                                                                           |
+| `GET /v1/admin/review-queue`             | admin   | —                                        | `{ observations }`         | até 50 pendentes                                                                                                          |
+| `POST /v1/admin/prices`                  | admin   | `ManualPriceRequest` (centavos)          | `201 { ok: true }`         | grava `source=manual`, `approved`, atualiza `current_prices`                                                              |
+| `POST /v1/admin/observations/:id/review` | admin   | `{ decision: "approved" \| "rejected" }` | `{ ok: true }`             | só observações `pending`; `404` se não existe ou já foi decidida; registra `reviewed_by/at` e resolve a tarefa de revisão |
 
 Regras gerais: valores monetários em **centavos inteiros**; datas ISO 8601; ids UUID; corpo máximo 64 KB; sem CORS habilitado (a API é consumida pelo servidor do Next, não pelo navegador).
 

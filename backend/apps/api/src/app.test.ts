@@ -51,7 +51,7 @@ function createAdminServiceStub(): AdminService {
     getPriceFormOptions: vi.fn().mockResolvedValue({ stores: [], products: [] }),
     getReviewQueue: vi.fn().mockResolvedValue([]),
     createManualPrice: vi.fn().mockResolvedValue(undefined),
-    reviewObservation: vi.fn().mockResolvedValue(undefined),
+    reviewObservation: vi.fn().mockResolvedValue(true),
   };
 }
 
@@ -309,6 +309,19 @@ describe("administração", () => {
     const ok = await app.request(path, jsonPost({ decision: "rejected" }, bearer("admin-token")));
     expect(ok.status).toBe(200);
     expect(adminService.reviewObservation).toHaveBeenCalledWith(OBSERVATION_ID, "rejected");
+  });
+
+  it("revisar observação inexistente ou já decidida devolve 404, não falso sucesso", async () => {
+    // Regressão: o serviço atualizava 0 linhas e a API respondia 200 {ok:true}; um segundo admin
+    // achava que a decisão dele tinha valido.
+    const { app, adminService } = buildTestApp();
+    vi.mocked(adminService.reviewObservation).mockResolvedValueOnce(false);
+    const response = await app.request(
+      `/v1/admin/observations/${OBSERVATION_ID}/review`,
+      jsonPost({ decision: "approved" }, bearer("admin-token")),
+    );
+    expect(response.status).toBe(404);
+    expect(((await response.json()) as { error: { code: string } }).error.code).toBe("not_found");
   });
 });
 

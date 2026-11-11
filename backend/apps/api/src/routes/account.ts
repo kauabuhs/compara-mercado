@@ -6,6 +6,7 @@ import {
 import { Hono } from "hono";
 import { requireAdmin, requireUser } from "../http/auth";
 import { type AppEnv, parseJsonBody, parseUuidParam } from "../http/context";
+import { errors } from "../http/errors";
 import type { Services } from "../services/types";
 
 /** Dados do usuário logado. O front usa para decidir o que mostrar; a autorização real é aqui. */
@@ -44,7 +45,10 @@ export function adminRoutes(services: Services) {
   routes.post(apiRoutes.adminReviewObservation(":observationId"), async (c) => {
     const observationId = parseUuidParam(c, "observationId");
     const { decision } = await parseJsonBody(c, ReviewObservationRequestSchema);
-    await services.adminFor(c.get("accessToken")).reviewObservation(observationId, decision);
+    const decided = await services
+      .adminFor(c.get("accessToken"))
+      .reviewObservation(observationId, decision);
+    if (!decided) throw errors.notFound("Observação não encontrada ou já revisada.");
     return c.json({ ok: true });
   });
 

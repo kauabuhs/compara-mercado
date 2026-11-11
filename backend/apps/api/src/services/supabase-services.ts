@@ -169,13 +169,16 @@ function createAdminService(userDb: Db): AdminService {
     },
 
     async reviewObservation(observationId, decision) {
-      const { error } = await userDb
+      const { data: decided, error } = await userDb
         .from("price_observations")
         .update({ status: decision })
         .eq("id", observationId)
-        .eq("status", "pending");
+        .eq("status", "pending")
+        .select("id");
       throwIfError("reviewObservation", error);
+      if (!decided?.length) return false;
       if (decision === "approved") await userDb.rpc("refresh_current_prices");
+      return true;
     },
   };
 }

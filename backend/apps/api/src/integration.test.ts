@@ -147,5 +147,17 @@ describe.skipIf(!supabaseUrl || !anonKey)("API contra o Supabase local", () => {
         ).success,
       ).toBe(true);
     });
+
+    it("revisar observação inexistente devolve 404 (antes: 200 {ok:true} sem ter decidido nada)", async () => {
+      const response = await app.request(
+        "/v1/admin/observations/00000000-0000-4000-8000-0000000000aa/review",
+        {
+          method: "POST",
+          headers: { authorization: `Bearer ${adminToken}`, "content-type": "application/json" },
+          body: JSON.stringify({ decision: "approved" }),
+        },
+      );
+      expect(response.status).toBe(404);
+    });
   });
 });

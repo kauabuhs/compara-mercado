@@ -37,7 +37,8 @@ export interface AdminService {
   getPriceFormOptions(): Promise<PriceFormOptions>;
   getReviewQueue(): Promise<PendingObservation[]>;
   createManualPrice(request: ManualPriceRequest, adminUserId: string): Promise<void>;
-  reviewObservation(observationId: string, decision: ReviewDecision): Promise<void>;
+  /** Registra a decisão. `false` = nada foi decidido (não existe ou já saiu de "pending"). */
+  reviewObservation(observationId: string, decision: ReviewDecision): Promise<boolean>;
 }
 
 export interface Authenticator {
