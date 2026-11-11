@@ -56,6 +56,7 @@ export function PriceForm({ stores, products }: { stores: Option[]; products: Op
           required
           placeholder="5,99"
           pattern="\d{1,6}([.,]\d{1,2})?"
+          title="Use só números, com até 2 casas decimais. Exemplo: 5,99"
         />
       </div>
       <label className="flex min-h-11 items-center gap-3">

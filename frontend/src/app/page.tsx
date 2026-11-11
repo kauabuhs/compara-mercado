@@ -47,7 +47,7 @@ export default async function HomePage() {
           </h2>
           <Link
             href="/ofertas"
-            className="text-sm font-medium text-brand underline-offset-4 hover:underline"
+            className="inline-flex min-h-11 items-center text-sm font-medium text-brand underline-offset-4 hover:underline"
           >
             Ver todas
           </Link>
