@@ -1,3 +1,11 @@
 @import "@compara/ui/styles.css";
 @import "maplibre-gl/dist/maplibre-gl.css";
 @source "../../packages/ui/src";
+
+/* Botões de zoom do MapLibre: 29px por padrão, pequenos demais para o polegar. */
+@media (pointer: coarse) {
+  .maplibregl-ctrl-group button {
+    width: 44px;
+    height: 44px;
+  }
+}

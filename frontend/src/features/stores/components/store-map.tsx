@@ -1,6 +1,13 @@
 "use client";
 
-import { LngLatBounds, Map as MapLibreMap, Marker, NavigationControl, Popup } from "maplibre-gl";
+import {
+  LngLatBounds,
+  Map as MapLibreMap,
+  Marker,
+  NavigationControl,
+  Popup,
+  setWorkerUrl,
+} from "maplibre-gl";
 import { useEffect, useRef } from "react";
 
 export interface MapStore {
@@ -9,6 +16,10 @@ export interface MapStore {
   lat: number;
   lng: number;
 }
+
+// O MapLibre resolve o worker relativo ao chunk empacotado (/_next/static/chunks/), onde o arquivo
+// não existe: 404 e "Worker failed to load". O bundler emite o worker como asset e passamos a URL.
+setWorkerUrl(new URL("maplibre-gl/dist/maplibre-gl-worker.mjs", import.meta.url).href);
 
 /** Mapa com MapLibre + OpenStreetMap (sem custo por carregamento). */
 export function StoreMap({ stores }: { stores: readonly MapStore[] }) {

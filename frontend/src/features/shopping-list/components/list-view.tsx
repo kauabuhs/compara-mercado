@@ -19,8 +19,17 @@ export function ListView() {
   const [userLocation, setUserLocation] = useState<UserLocation>(null);
   const [comparisonState, setComparisonState] = useState<ComparisonState>({ status: "idle" });
   const [geoMessage, setGeoMessage] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+
+  // Voltou a conexão: tenta comparar de novo sem o usuário precisar mexer na lista.
+  useEffect(() => {
+    const retry = () => setRetryCount((count) => count + 1);
+    window.addEventListener("online", retry);
+    return () => window.removeEventListener("online", retry);
+  }, []);
 
   // Recompara sempre que a lista ou a posição mudam (com pequena espera para agrupar cliques).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: retryCount é o gatilho de nova tentativa ao voltar a conexão
   useEffect(() => {
     if (listItems.length === 0) {
       setComparisonState({ status: "idle" });
@@ -29,22 +38,31 @@ export function ListView() {
     let isCancelled = false;
     setComparisonState({ status: "loading" });
     const debounceTimer = setTimeout(async () => {
-      const actionResult = await compareListAction({
-        items: listItems.map((item) => ({ productId: item.productId, quantity: item.quantity })),
-        ...(userLocation ? { where: userLocation } : {}),
-      });
-      if (isCancelled) return;
-      setComparisonState(
-        actionResult.ok
+      let nextState: ComparisonState;
+      try {
+        const actionResult = await compareListAction({
+          items: listItems.map((item) => ({ productId: item.productId, quantity: item.quantity })),
+          ...(userLocation ? { where: userLocation } : {}),
+        });
+        nextState = actionResult.ok
           ? { status: "ok", comparison: actionResult.data }
-          : { status: "error", message: actionResult.error },
-      );
+          : { status: "error", message: actionResult.error };
+      } catch {
+        // Sem rede (ou servidor fora do ar) a Server Action rejeita; sem isto o estado ficava
+        // preso em "loading" para sempre. A lista está salva no aparelho, só a comparação espera.
+        nextState = {
+          status: "error",
+          message:
+            "Sem conexão. Sua lista está salva; os preços voltam assim que a internet voltar.",
+        };
+      }
+      if (!isCancelled) setComparisonState(nextState);
     }, 250);
     return () => {
       isCancelled = true;
       clearTimeout(debounceTimer);
     };
-  }, [listItems, userLocation]);
+  }, [listItems, userLocation, retryCount]);
 
   const productNameById = useMemo(
     () => new Map(listItems.map((item) => [item.productId, item.name])),
