@@ -22,7 +22,14 @@ export async function createAuthClient() {
         setAll: (cookiesToSet) => {
           try {
             for (const { name, value, options } of cookiesToSet) {
-              cookieStore.set(name, value, options);
+              // O navegador nunca usa o Supabase direto (ADR-0005): só o servidor do Next lê estes
+              // cookies. httpOnly impede que um XSS roube o token; o padrão do @supabase/ssr é false.
+              cookieStore.set(name, value, {
+                ...options,
+                httpOnly: true,
+                sameSite: "lax",
+                secure: process.env["NODE_ENV"] === "production",
+              });
             }
           } catch {
             // Chamado de um Server Component (somente leitura): a sessão é renovada na próxima ação.

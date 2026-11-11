@@ -44,6 +44,7 @@ Pediu-se uma separação física, lógica e arquitetural entre front-end e back-
 - (−) **O cache de dados do Next não funcionou como esperado.** Medimos: com `fetch(..., { next: { revalidate } })` em páginas renderizadas sob demanda, N cargas geravam N chamadas à API (com e sem `AbortSignal`, com e sem `fetchCache = "default-cache"`). Em vez de depender de comportamento interno do Next, o cache passou para a API (`x-cache: HIT/MISS`). Efeito: as páginas públicas deixam de ser pré-renderizadas (ISR) e passam a renderizar a cada requisição, com os dados vindos do cache da API.
 - (−) Limite de taxa e cache são **por instância**. Com mais de uma instância da API o limite efetivo é maior.
 - (−) O IP do cliente chega por `X-Forwarded-For`; a API precisa ficar atrás do proxy (rede privada/firewall) para não permitir forjar o cabeçalho.
+  - O front lê o IP **da direita** do cabeçalho, pulando `TRUSTED_PROXY_HOPS` proxies confiáveis (padrão 1): a entrada mais à esquerda é controlada pelo cliente e permitiria contornar o rate limit. Ajuste o valor conforme a infraestrutura (CDN + balanceador = 2).
 - (−) O limitador do login (5/10 min) fica no Next e o da comparação (30/min) na API: duas implementações pequenas do mesmo algoritmo, porque `frontend` e `backend` não compartilham código.
 - (−) Uma mudança de formato exige tocar `shared/contracts`, a rota e o serviço (e o front, se for incompatível). É intencional.
 

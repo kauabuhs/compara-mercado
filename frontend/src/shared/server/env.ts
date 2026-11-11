@@ -6,6 +6,8 @@ const schema = z.object({
   NEXT_PUBLIC_SITE_URL: z.url().default("http://localhost:3000"),
   /** URL da API do back-end, acessada só pelo servidor do Next (nunca pelo navegador). */
   API_URL: z.url(),
+  /** Quantos proxies confiáveis ficam à frente do app (X-Forwarded-For é lido da direita). */
+  TRUSTED_PROXY_HOPS: z.coerce.number().int().min(1).max(5).default(1),
 });
 
 export type Env = z.infer<typeof schema>;
@@ -25,6 +27,7 @@ export function env(): Env {
     NEXT_PUBLIC_SITE_URL: process.env["NEXT_PUBLIC_SITE_URL"],
     // Em desenvolvimento a API local é o padrão; em produção a variável é obrigatória.
     API_URL: process.env["API_URL"] ?? (isProduction ? undefined : "http://127.0.0.1:4000"),
+    TRUSTED_PROXY_HOPS: process.env["TRUSTED_PROXY_HOPS"],
   });
   if (!parsed.success) {
     const fields = parsed.error.issues.map((issue) => issue.path.join(".")).join(", ");
