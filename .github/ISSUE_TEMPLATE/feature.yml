@@ -1,0 +1,17 @@
+name: Funcionalidade
+description: "Proposta de melhoria (lembre: o MVP responde uma pergunta só)"
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes: { label: Qual problema do usuário isso resolve? }
+    validations: { required: true }
+  - type: textarea
+    id: idea
+    attributes: { label: Proposta }
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Ajuda a responder "onde minha lista sai mais barata?"
+      options: [Sim, diretamente, Indiretamente, Não (fica fora do MVP)]
+    validations: { required: true }

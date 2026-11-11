@@ -1,0 +1,62 @@
+name: Deploy
+
+# Staging: automático a cada merge na main. Produção: por tag vX.Y.Z, com aprovação manual
+# (configure "Required reviewers" no environment `production` em Settings → Environments).
+# O front (Next.js) é publicado pela integração Git da Vercel; aqui ficam o BANCO, a API e o WORKER.
+# Ordem de uma mudança de contrato: banco -> API -> front (a API é compatível com o front anterior
+# dentro da mesma versão maior de CONTRACT_VERSION).
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false # nunca cancela uma migração no meio
+
+jobs:
+  migrate:
+    name: Migrações (${{ startsWith(github.ref, 'refs/tags/') && 'produção' || 'staging' }})
+    runs-on: ubuntu-latest
+    environment: ${{ startsWith(github.ref, 'refs/tags/') && 'production' || 'staging' }}
+    timeout-minutes: 10
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { persist-credentials: false }
+      - uses: supabase/setup-cli@v1
+        with: { version: latest }
+      - name: Confere se os segredos do ambiente existem
+        run: |
+          for v in SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD PROJECT_REF; do
+            [ -n "${!v}" ] || { echo "::error::Segredo $v ausente neste environment"; exit 1; }
+          done
+      - run: supabase link --workdir backend --project-ref "$PROJECT_REF"
+      - name: Prévia das migrações pendentes
+        run: supabase db push --workdir backend --dry-run
+      - name: Aplica as migrações
+        run: supabase db push --workdir backend
+
+  # API e worker: descomente quando o host (Railway ou Fly.io) for decidido (decisão em aberto, ADR-0001).
+  # Cada serviço é implantado de forma independente, com a própria imagem e as próprias variáveis.
+  # api:
+  #   needs: migrate
+  #   runs-on: ubuntu-latest
+  #   environment: ${{ startsWith(github.ref, 'refs/tags/') && 'production' || 'staging' }}
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - run: echo "build da imagem backend/apps/api/Dockerfile e deploy no host escolhido"
+  # worker:
+  #   needs: migrate
+  #   runs-on: ubuntu-latest
+  #   environment: ${{ startsWith(github.ref, 'refs/tags/') && 'production' || 'staging' }}
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - run: echo "build da imagem backend/apps/worker/Dockerfile e deploy no host escolhido"
