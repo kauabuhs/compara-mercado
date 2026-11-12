@@ -14,7 +14,7 @@
       "!**/.turbo",
       "!**/coverage",
       "!pnpm-lock.yaml",
-      "!backend/packages/db/src/database.types.ts"
+      "!ComparaMercado-Back/src/database/database.types.ts"
     ]
   },
   "formatter": {

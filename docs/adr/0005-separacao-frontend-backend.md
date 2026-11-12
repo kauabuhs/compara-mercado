@@ -4,6 +4,7 @@
 - **Data:** 2026-11-11
 - **Decisor:** Kauã Buhs
 - **Substitui:** a decisão "sem servidor de API dedicado" do [ADR-0004](0004-fronteiras-e-contratos.md)
+- **Atualização (2026-11-11):** o layout físico (`frontend/`, `backend/`, `shared/`) foi substituído pelo [ADR-0007](0007-layout-front-back-por-aplicacao.md); a separação lógica e a API HTTP continuam valendo
 - **Complementa:** [ADR-0001](0001-stack.md), [ADR-0002](0002-supply-chain.md)
 
 ## Contexto

@@ -1,11 +1,8 @@
 packages:
-  # frontend e backend são aplicações independentes; shared só tem contratos e config
-  - "frontend"
-  - "frontend/packages/*"
-  - "backend"
-  - "backend/apps/*"
-  - "backend/packages/*"
-  - "shared/*"
+  # Duas aplicações independentes, como no ProAgendaV2: Back e Front. O contrato HTTP mora em
+  # ComparaMercado-Back/src/contracts e o Front o lê pelo alias @contracts (ver docs/adr/0007).
+  - "ComparaMercado-Back"
+  - "ComparaMercado-Front"
 
 # Endurecimento da cadeia de suprimentos (ver docs/adr/0002-supply-chain.md)
 # Só instala versões publicadas há 7 dias ou mais

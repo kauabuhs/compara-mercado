@@ -38,11 +38,11 @@ jobs:
           for v in SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD PROJECT_REF; do
             [ -n "${!v}" ] || { echo "::error::Segredo $v ausente neste environment"; exit 1; }
           done
-      - run: supabase link --workdir backend --project-ref "$PROJECT_REF"
+      - run: supabase link --workdir ComparaMercado-Back --project-ref "$PROJECT_REF"
       - name: Prévia das migrações pendentes
-        run: supabase db push --workdir backend --dry-run
+        run: supabase db push --workdir ComparaMercado-Back --dry-run
       - name: Aplica as migrações
-        run: supabase db push --workdir backend
+        run: supabase db push --workdir ComparaMercado-Back
 
   # API e worker: descomente quando o host (Railway ou Fly.io) for decidido (decisão em aberto, ADR-0001).
   # Cada serviço é implantado de forma independente, com a própria imagem e as próprias variáveis.
@@ -52,11 +52,11 @@ jobs:
   #   environment: ${{ startsWith(github.ref, 'refs/tags/') && 'production' || 'staging' }}
   #   steps:
   #     - uses: actions/checkout@v4
-  #     - run: echo "build da imagem backend/apps/api/Dockerfile e deploy no host escolhido"
+  #     - run: echo "build da imagem ComparaMercado-Back/Dockerfile e deploy no host escolhido"
   # worker:
   #   needs: migrate
   #   runs-on: ubuntu-latest
   #   environment: ${{ startsWith(github.ref, 'refs/tags/') && 'production' || 'staging' }}
   #   steps:
   #     - uses: actions/checkout@v4
-  #     - run: echo "build da imagem backend/apps/worker/Dockerfile e deploy no host escolhido"
+  #     - run: echo "build da imagem ComparaMercado-Back/Dockerfile.worker e deploy no host escolhido"

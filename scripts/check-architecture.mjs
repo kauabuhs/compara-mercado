@@ -11,23 +11,13 @@ import path from "node:path";
 const root = path.resolve(import.meta.dirname, "..");
 const toRelative = (absolutePath) => path.relative(root, absolutePath).replaceAll("\\", "/");
 
-// --- 1. Coleta de arquivos e imports --------------------------------------------------------
-function listDirectories(parent) {
-  const parentPath = path.join(root, parent);
-  if (!fs.existsSync(parentPath)) return [];
-  return fs
-    .readdirSync(parentPath, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => `${parent}/${entry.name}`);
-}
+const BACK = "ComparaMercado-Back";
+const BACK_SRC = `${BACK}/src`;
+const FRONT = "ComparaMercado-Front";
+const FRONT_SRC = `${FRONT}/src`;
 
-const sourceDirectories = [
-  "frontend",
-  ...listDirectories("frontend/packages"),
-  ...listDirectories("backend/apps"),
-  ...listDirectories("backend/packages"),
-  ...listDirectories("shared"),
-]
+// --- 1. Coleta de arquivos e imports --------------------------------------------------------
+const sourceDirectories = [BACK, FRONT]
   .map((unitDirectory) => path.join(root, unitDirectory, "src"))
   .filter((sourceDirectory) => fs.existsSync(sourceDirectory));
 
@@ -51,7 +41,8 @@ const DYNAMIC_RE = /import\(\s*["']([^"']+)["']\s*\)/g;
 
 function resolveLocal(fromFile, specifier) {
   let base;
-  if (specifier.startsWith("@/")) base = `frontend/src/${specifier.slice(2)}`;
+  if (specifier === "@contracts") base = `${BACK_SRC}/contracts/index`;
+  else if (specifier.startsWith("@/")) base = `${FRONT_SRC}/${specifier.slice(2)}`;
   else if (specifier.startsWith(".")) {
     base = path.posix.join(path.posix.dirname(fromFile), specifier);
   } else return null;
@@ -94,16 +85,9 @@ for (const filePath of files) {
 const violations = [];
 const fail = (rule, filePath, message) => violations.push(`[${rule}] ${filePath}: ${message}`);
 
-/** Unidade (workspace) a que o arquivo pertence. */
-function unitOf(filePath) {
-  const parts = filePath.split("/");
-  if (parts[0] === "frontend") {
-    return parts[1] === "packages" ? parts.slice(0, 3).join("/") : "frontend";
-  }
-  if (parts[0] === "backend") return parts.slice(0, 3).join("/");
-  return parts.slice(0, 2).join("/");
-}
-const sideOf = (filePath) => filePath.split("/")[0]; // frontend | backend | shared
+const WORKSPACE_UNITS = [BACK, FRONT];
+const sideOf = (filePath) => (filePath.startsWith(`${BACK}/`) ? "back" : "frontend");
+const isBack = (filePath) => filePath.startsWith(`${BACK_SRC}/`);
 
 // R1 — sem ciclos entre arquivos
 {
@@ -124,95 +108,104 @@ const sideOf = (filePath) => filePath.split("/")[0]; // frontend | backend | sha
   for (const filePath of files) if (!color.get(filePath)) visit(filePath);
 }
 
-// R2 — direção das dependências entre workspaces
-const ALLOWED_WORKSPACE_DEPENDENCIES = {
-  "shared/config": [],
-  "shared/contracts": [],
-  "backend/packages/domain": [],
-  "backend/packages/ingest": ["domain"],
-  "backend/packages/ai": [],
-  "backend/packages/db": ["contracts", "domain"],
-  "backend/apps/api": ["contracts", "db", "domain"],
-  "backend/apps/worker": ["ai", "db", "domain", "ingest"],
-  "frontend/packages/ui": ["contracts"],
-  frontend: ["contracts", "ui"],
-};
+// R2 — nenhum pacote @compara/*: Back e Front são aplicações autocontidas (como no ProAgendaV2).
+// O único elo entre elas é o alias @contracts (ver R3).
 for (const [filePath, fileImports] of imports) {
-  const unit = unitOf(filePath);
-  const allowed = ALLOWED_WORKSPACE_DEPENDENCIES[unit];
   for (const { specifier } of fileImports) {
-    if (!specifier.startsWith("@compara/")) continue;
-    const [, name, ...deepPath] = specifier.split("/");
-    if (deepPath.length) {
-      fail("R2-import-profundo", filePath, `${specifier} (use só o ponto de entrada do pacote)`);
-    }
-    if (name === "config") continue;
-    if (!allowed?.includes(name)) {
-      fail("R2-direção", filePath, `${unit} não pode depender de @compara/${name}`);
-    }
-  }
-}
-
-// R3 — front-end e back-end não se enxergam; shared não conhece nenhum dos dois
-for (const [filePath, fileImports] of imports) {
-  const side = sideOf(filePath);
-  for (const { local } of fileImports) {
-    if (!local) continue;
-    const targetSide = sideOf(local);
-    if (targetSide === side) continue;
-    const isAllowedCrossing = targetSide === "shared";
-    if (!isAllowedCrossing) {
-      fail("R3-lados", filePath, `${side} não pode importar ${targetSide} (${local})`);
-    }
-  }
-}
-
-// R4 — pacotes puros não tocam framework, banco, rede nem Node
-const PURE_UNITS = ["backend/packages/domain", "backend/packages/ingest", "shared/contracts"];
-const FORBIDDEN_IN_PURE =
-  /^(@supabase\/|next($|\/)|react($|\/)|hono($|\/)|@hono\/|pg-boss|pg$|@anthropic-ai\/|pino|node:)/;
-for (const [filePath, fileImports] of imports) {
-  if (!PURE_UNITS.includes(unitOf(filePath))) continue;
-  for (const { specifier } of fileImports) {
-    if (FORBIDDEN_IN_PURE.test(specifier)) {
-      fail("R4-pureza", filePath, `pacote puro não pode importar "${specifier}"`);
-    }
-  }
-}
-
-// R5 — front-end: features isoladas entre si; shared não conhece features nem app
-const featureOf = (filePath) => filePath.match(/^frontend\/src\/features\/([^/]+)\//)?.[1] ?? null;
-for (const [filePath, fileImports] of imports) {
-  if (!filePath.startsWith("frontend/src/")) continue;
-  const feature = featureOf(filePath);
-  for (const { local } of fileImports) {
-    if (!local) continue;
-    const targetFeature = featureOf(local);
-    if (feature && targetFeature && feature !== targetFeature) {
+    if (specifier.startsWith("@compara/")) {
       fail(
-        "R5-feature",
+        "R2-pacote",
         filePath,
-        `feature "${feature}" não pode importar a feature "${targetFeature}" (${local})`,
+        `${specifier}: não há pacotes compartilhados; use imports locais`,
       );
     }
-    if (
-      filePath.startsWith("frontend/src/shared/") &&
-      (targetFeature || local.startsWith("frontend/src/app/"))
-    ) {
-      fail("R5-shared", filePath, `shared não pode depender de features/app (${local})`);
+  }
+}
+
+// R3 — front-end e back-end não se enxergam por caminho. Única exceção: o Front lê o contrato HTTP
+// (schemas Zod e tipos puros) pelo alias @contracts -> ComparaMercado-Back/src/contracts.
+for (const [filePath, fileImports] of imports) {
+  const side = sideOf(filePath);
+  for (const { local, specifier } of fileImports) {
+    if (specifier === "@contracts" && side === "frontend") continue;
+    if (local && sideOf(local) !== side) {
+      fail("R3-lados", filePath, `${side} não pode importar ${sideOf(local)} (${local})`);
     }
-    if (feature && local.startsWith("frontend/src/app/")) {
-      fail("R5-camadas", filePath, `feature não pode depender de app/ (${local})`);
+  }
+}
+
+// R4 — regras de negócio puras: sem framework, banco, rede, Node nem camadas de infraestrutura
+const PURE_FILES = new Set([
+  ...["domain-error", "freshness", "gtin", "money", "normalize", "units"].map(
+    (name) => `${BACK_SRC}/lib/${name}.ts`,
+  ),
+  `${BACK_SRC}/modules/catalog/service/compare.ts`,
+  ...["golden", "match", "publish", "trigram", "validate"].map(
+    (name) => `${BACK_SRC}/modules/ingest/service/${name}.ts`,
+  ),
+]);
+const isPure = (filePath) =>
+  PURE_FILES.has(filePath) || filePath.startsWith(`${BACK_SRC}/contracts/`);
+const FORBIDDEN_IN_PURE =
+  /^(@supabase\/|next($|\/)|react($|\/)|hono($|\/)|@hono\/|pg-boss|pg$|drizzle-orm|@anthropic-ai\/|pino|node:)/;
+for (const [filePath, fileImports] of imports) {
+  if (!isPure(filePath) || filePath.includes("/__tests__/")) continue;
+  for (const { specifier, local } of fileImports) {
+    if (FORBIDDEN_IN_PURE.test(specifier)) {
+      fail("R4-pureza", filePath, `arquivo de regra pura não pode importar "${specifier}"`);
+    }
+    if (local && /\/(database|middlewares|repository|controller|jobs)\//.test(`/${local}`)) {
+      fail(
+        "R4-pureza",
+        filePath,
+        `arquivo de regra pura não pode importar infraestrutura (${local})`,
+      );
+    }
+  }
+}
+
+// R5 — front-end: módulos isolados entre si; as camadas compartilhadas (components, lib, services,
+// stores, server, hooks, types) não conhecem módulos nem app. O que dois módulos usam sobe de camada.
+const FRONT_SHARED_LAYERS = ["components", "lib", "services", "stores", "server", "hooks", "types"];
+const moduleOf = (filePath) =>
+  filePath.match(new RegExp(`^${FRONT_SRC}/modules/([^/]+)/`))?.[1] ?? null;
+const sharedLayerOf = (filePath) => {
+  const layer = filePath.slice(FRONT_SRC.length + 1).split("/")[0] ?? "";
+  return FRONT_SHARED_LAYERS.includes(layer) ? layer : null;
+};
+for (const [filePath, fileImports] of imports) {
+  if (!filePath.startsWith(`${FRONT_SRC}/`)) continue;
+  const currentModule = moduleOf(filePath);
+  const currentLayer = sharedLayerOf(filePath);
+  for (const { local } of fileImports) {
+    if (!local) continue;
+    const targetModule = moduleOf(local);
+    if (currentModule && targetModule && currentModule !== targetModule) {
+      fail(
+        "R5-módulo",
+        filePath,
+        `módulo "${currentModule}" não pode importar o módulo "${targetModule}" (${local}); o que dois módulos usam vai para stores/, lib/ ou components/`,
+      );
+    }
+    if (currentLayer && (targetModule || local.startsWith(`${FRONT_SRC}/app/`))) {
+      fail(
+        "R5-camadas",
+        filePath,
+        `${currentLayer}/ não pode depender de modules/ ou app/ (${local})`,
+      );
+    }
+    if (currentModule && local.startsWith(`${FRONT_SRC}/app/`)) {
+      fail("R5-camadas", filePath, `módulo não pode depender de app/ (${local})`);
     }
   }
 }
 
 // R6 — front-end: código de navegador não toca código de servidor; Supabase só para sessão
 const isComponentFile = (filePath) =>
-  /\/components\//.test(filePath) && filePath.startsWith("frontend/src/");
-const SERVER_ONLY_LOCAL = /^frontend\/src\/shared\/(server|api)\//;
+  /\/components\//.test(filePath) && filePath.startsWith(`${FRONT_SRC}/`);
+const SERVER_ONLY_LOCAL = new RegExp(`^${FRONT_SRC}/(server|services/api)/`);
 for (const [filePath, fileImports] of imports) {
-  if (!filePath.startsWith("frontend/src/")) continue;
+  if (!filePath.startsWith(`${FRONT_SRC}/`)) continue;
   const isClientCode =
     /^\s*["']use client["']/.test(sources.get(filePath) ?? "") || isComponentFile(filePath);
   for (const { specifier, local } of fileImports) {
@@ -224,73 +217,96 @@ for (const [filePath, fileImports] of imports) {
       );
     }
     const isSupabaseImport = specifier.startsWith("@supabase/");
-    if (isSupabaseImport && !filePath.startsWith("frontend/src/shared/server/supabase/")) {
-      fail(
-        "R6-supabase",
-        filePath,
-        "o front só usa o Supabase para sessão, em shared/server/supabase/",
-      );
+    if (isSupabaseImport && !filePath.startsWith(`${FRONT_SRC}/server/supabase/`)) {
+      fail("R6-supabase", filePath, "o front só usa o Supabase para sessão, em server/supabase/");
     }
   }
 }
 
-// R7 — segredos: service_role só no worker; segredos do back-end nunca aparecem no front-end
-const SERVICE_ROLE_ALLOWED_PREFIXES = ["backend/apps/worker/", "backend/packages/db/"];
+// R7 — segredos: service_role só no worker/infra; segredos do back-end nunca aparecem no front-end
+const SERVICE_ROLE_ALLOWED = [
+  `${BACK_SRC}/worker.ts`,
+  `${BACK_SRC}/jobs/`,
+  `${BACK_SRC}/config/worker-env.ts`,
+  `${BACK_SRC}/lib/logger.ts`, // só cita o nome da chave na lista de campos a ocultar nos logs
+  `${BACK_SRC}/database/`,
+  `${BACK_SRC}/modules/ingest/`,
+  `${BACK_SRC}/__tests__/`,
+];
 const BACKEND_SECRET_NAMES = /SERVICE_ROLE|ANTHROPIC_API_KEY|DATABASE_URL/;
 for (const [filePath, source] of sources) {
   const usesServiceRole = /createServiceClient|SERVICE_ROLE/.test(source);
-  const isAllowed = SERVICE_ROLE_ALLOWED_PREFIXES.some((prefix) => filePath.startsWith(prefix));
+  const isAllowed = SERVICE_ROLE_ALLOWED.some((prefix) => filePath.startsWith(prefix));
   if (usesServiceRole && !isAllowed) {
-    fail("R7-segredo", filePath, "service_role só pode ser usado em backend/apps/worker");
+    fail(
+      "R7-segredo",
+      filePath,
+      "service_role só pode ser usado no worker, jobs, database e testes",
+    );
   }
   if (sideOf(filePath) === "frontend" && BACKEND_SECRET_NAMES.test(source)) {
     fail("R7-segredo", filePath, "o front-end não pode referenciar segredos do back-end");
   }
 }
 
-// R8 — API: rotas e camada HTTP não tocam persistência; só os serviços falam com o banco
+// R8 — camada HTTP (controller, middlewares, app) não toca persistência: só o service fala com o repository
+const isHttpLayer = (filePath) =>
+  /^ComparaMercado-Back\/src\/modules\/[^/]+\/controller\//.test(filePath) ||
+  filePath.startsWith(`${BACK_SRC}/middlewares/`) ||
+  filePath === `${BACK_SRC}/app.ts`;
 for (const [filePath, fileImports] of imports) {
-  if (!/^backend\/apps\/api\/src\/(routes|http)\//.test(filePath)) continue;
-  for (const { specifier } of fileImports) {
-    if (specifier === "@compara/db" || specifier.startsWith("@supabase/")) {
+  if (!isHttpLayer(filePath) || filePath.includes("/__tests__/")) continue;
+  for (const { specifier, local } of fileImports) {
+    const touchesPersistence =
+      /^(@supabase\/|drizzle-orm|pg$)/.test(specifier) ||
+      (local &&
+        /\/(database|repository)\//.test(`/${local}`) &&
+        !local.endsWith("/database/errors.ts")); // a classe de erro (DbError) não é persistência
+    if (touchesPersistence) {
       fail(
-        "R8-api",
+        "R8-http",
         filePath,
-        `rotas/HTTP não acessam persistência ("${specifier}"): use services/`,
+        `controller/middlewares não acessam persistência ("${specifier}"): use o service`,
       );
     }
   }
 }
 
-// R9 — worker: o pipeline (aplicação) não conhece infraestrutura; só main/jobs/supabase-repo ligam tudo
-const WORKER_INFRASTRUCTURE_FILES = new Set([
-  "backend/apps/worker/src/main.ts",
-  "backend/apps/worker/src/jobs.ts",
-  "backend/apps/worker/src/pipeline/supabase-repo.ts",
-]);
+// R9 — camadas dos módulos: repository não conhece controller; service não conhece controller;
+// o caso de uso do pipeline (service) não conhece infraestrutura (só as portas de pipeline.types.ts)
+const layerOf = (filePath) =>
+  filePath.match(
+    /^ComparaMercado-Back\/src\/modules\/[^/]+\/(controller|service|repository)\//,
+  )?.[1];
+const PIPELINE_USE_CASE = `${BACK_SRC}/modules/ingest/service/pipeline.service.ts`;
 for (const [filePath, fileImports] of imports) {
-  const isWorkerFile = filePath.startsWith("backend/apps/worker/src/");
-  if (!isWorkerFile || WORKER_INFRASTRUCTURE_FILES.has(filePath)) continue;
-  // Teste de integração liga a infraestrutura real (Postgres/Storage) de propósito: é onde se
-  // valida o adaptador. Só ele é isento; o código de produção do pipeline segue sem infra.
-  if (filePath.endsWith("/integration.test.ts")) continue;
-  for (const { specifier, local } of fileImports) {
-    const isInfrastructure =
-      /^(@supabase\/|pg-boss)/.test(specifier) ||
-      specifier === "@compara/db" ||
-      local?.endsWith("supabase-repo.ts");
-    if (isInfrastructure) {
-      fail(
-        "R9-worker",
-        filePath,
-        `fora de main/jobs/supabase-repo não se importa infraestrutura ("${specifier}")`,
-      );
+  if (!isBack(filePath) || filePath.includes("/__tests__/")) continue;
+  const layer = layerOf(filePath);
+  for (const { specifier, local, typeOnly } of fileImports) {
+    const targetLayer = local ? layerOf(local) : undefined;
+    if ((layer === "repository" || layer === "service") && targetLayer === "controller") {
+      fail("R9-camadas", filePath, `${layer} não pode depender de controller (${local})`);
+    }
+    if (layer === "repository" && targetLayer === "service" && !typeOnly && !isPure(local)) {
+      fail("R9-camadas", filePath, `repository só importa de service regras puras (${local})`);
+    }
+    if (filePath === PIPELINE_USE_CASE) {
+      const infra =
+        /^(@supabase\/|pg-boss|pg$|drizzle-orm)/.test(specifier) ||
+        (local && /\/(database|repository)\//.test(`/${local}`));
+      if (infra) {
+        fail(
+          "R9-camadas",
+          filePath,
+          `o caso de uso do pipeline não conhece infraestrutura ("${specifier}")`,
+        );
+      }
     }
   }
 }
 
 // --- 3. Resultado ---------------------------------------------------------------------------
-const unitCount = Object.keys(ALLOWED_WORKSPACE_DEPENDENCIES).length;
+const unitCount = WORKSPACE_UNITS.length;
 if (violations.length) {
   console.error(`✖ ${violations.length} violação(ões) de arquitetura:\n`);
   for (const violation of violations) console.error(`  ${violation}`);
@@ -300,5 +316,5 @@ if (violations.length) {
   process.exit(1);
 }
 console.log(
-  `✔ arquitetura ok — ${files.length} arquivos, ${unitCount} unidades, 9 regras (ciclos, direção, lados, pureza, features, navegador, segredos, api, worker)`,
+  `✔ arquitetura ok — ${files.length} arquivos, ${unitCount} unidades, 9 regras (ciclos, pacotes, lados, pureza, módulos, navegador, segredos, http, camadas)`,
 );

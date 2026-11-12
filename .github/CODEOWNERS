@@ -3,9 +3,9 @@
 # Enquanto desenvolvedor único, o CI faz o papel de revisor; isto protege o que é crítico.
 
 # Banco e segurança: toda mudança precisa de olhar atento
-/backend/supabase/                 @SEU-USUARIO
-/backend/apps/api/src/http/        @SEU-USUARIO
-/shared/contracts/                 @SEU-USUARIO
+/ComparaMercado-Back/supabase/         @SEU-USUARIO
+/ComparaMercado-Back/src/middlewares/   @SEU-USUARIO
+/ComparaMercado-Back/src/contracts/     @SEU-USUARIO
 /.github/                          @SEU-USUARIO
 /docs/adr/                         @SEU-USUARIO
-/frontend/next.config.ts           @SEU-USUARIO
+/ComparaMercado-Front/next.config.ts   @SEU-USUARIO

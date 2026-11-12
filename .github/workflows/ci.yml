@@ -16,8 +16,7 @@ permissions:
 env:
   CI: "true"
 
-# Front-end e back-end têm jobs próprios: cada lado compila e testa sem o outro.
-# Só `shared/contracts` é construído pelos dois.
+# Front e Back têm jobs próprios: cada aplicação compila e testa sem a outra.
 jobs:
   quality:
     name: Lint e fronteiras de arquitetura
@@ -34,7 +33,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Lint (Biome)
         run: pnpm lint
-      - name: Fronteiras de arquitetura (front, back e shared)
+      - name: Fronteiras de arquitetura (Front e Back)
         run: pnpm arch:check
 
   frontend:
@@ -51,7 +50,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Tipos, testes e build do front-end (e de suas dependências)
-        run: pnpm exec turbo run typecheck test build --filter=@compara/frontend...
+        run: pnpm exec turbo run typecheck test build --filter=comparamercado-front...
         env:
           # Valores fictícios só para o build; nenhum segredo real no CI. O build não precisa da API.
           NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
@@ -71,7 +70,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Tipos, testes e build
-        run: pnpm exec turbo run typecheck test build --filter=@compara/api... --filter=@compara/worker...
+        run: pnpm exec turbo run typecheck test build --filter=comparamercado-back...
 
   images:
     name: Imagens Docker (API e worker)
@@ -81,9 +80,9 @@ jobs:
       - uses: actions/checkout@v4
         with: { persist-credentials: false }
       - name: Build da imagem da API
-        run: docker build -f backend/apps/api/Dockerfile -t compara-api:ci .
+        run: docker build -f ComparaMercado-Back/Dockerfile -t compara-api:ci .
       - name: Build da imagem do worker
-        run: docker build -f backend/apps/worker/Dockerfile -t compara-worker:ci .
+        run: docker build -f ComparaMercado-Back/Dockerfile.worker -t compara-worker:ci .
 
   database:
     name: Banco (migrações do zero, RLS, tipos e API contra o Supabase)
@@ -101,21 +100,23 @@ jobs:
       - uses: supabase/setup-cli@v1
         with: { version: latest }
       - name: Sobe o Supabase local (aplica todas as migrações do zero + seed)
-        run: supabase start --workdir backend -x studio,imgproxy,edge-runtime,logflare,vector,supavisor
+        run: supabase start --workdir ComparaMercado-Back -x studio,imgproxy,edge-runtime,logflare,vector,supavisor
       - name: Testes pgTAP (RLS, privilégios, imutabilidade, comparação)
-        run: supabase test db --workdir backend
+        run: supabase test db --workdir ComparaMercado-Back
       - name: Os tipos gerados estão em dia com as migrações?
         run: |
-          supabase gen types typescript --schema public --workdir backend > /tmp/database.types.ts
-          diff -u backend/packages/db/src/database.types.ts /tmp/database.types.ts \
-            || { echo "::error::backend/packages/db/src/database.types.ts desatualizado. Rode 'pnpm db:types'."; exit 1; }
+          supabase gen types typescript --schema public --workdir ComparaMercado-Back > /tmp/database.types.ts
+          diff -u ComparaMercado-Back/src/database/database.types.ts /tmp/database.types.ts \
+            || { echo "::error::ComparaMercado-Back/src/database/database.types.ts desatualizado. Rode 'pnpm db:types'."; exit 1; }
       - name: "Integração com o banco (db: paridade SQL ↔ TypeScript; api: rotas reais com login de admin)"
         run: |
-          eval "$(supabase status -o env --workdir backend | sed 's/^/export /')"
+          eval "$(supabase status -o env --workdir ComparaMercado-Back | sed 's/^/export /')"
           export SUPABASE_TEST_URL="$API_URL" SUPABASE_TEST_ANON_KEY="$ANON_KEY"
           # Admin do seed LOCAL (só existe no Supabase local; nunca em staging/produção)
           export SUPABASE_TEST_ADMIN_EMAIL="admin@local.test" SUPABASE_TEST_ADMIN_PASSWORD="admin123456"
-          pnpm --filter @compara/db --filter @compara/api test
+          # Conexão direta ao Postgres: testes do Drizzle (espelho do schema e concorrência real de estoque/promoção)
+          export DATABASE_URL_TEST="$DB_URL"
+          pnpm --filter comparamercado-back test
 
   e2e:
     name: "E2E (Playwright: front → API → Supabase)"
@@ -132,19 +133,19 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - uses: supabase/setup-cli@v1
         with: { version: latest }
-      - run: supabase start --workdir backend -x studio,imgproxy,edge-runtime,logflare,vector,supavisor
-      - run: pnpm --filter @compara/frontend exec playwright install --with-deps chromium
+      - run: supabase start --workdir ComparaMercado-Back -x studio,imgproxy,edge-runtime,logflare,vector,supavisor
+      - run: pnpm --filter comparamercado-front exec playwright install --with-deps chromium
       - name: Build e testes e2e
         run: |
-          eval "$(supabase status -o env --workdir backend | sed 's/^/export /')"
+          eval "$(supabase status -o env --workdir ComparaMercado-Back | sed 's/^/export /')"
           export NEXT_PUBLIC_SUPABASE_URL="$API_URL" NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
           export SUPABASE_URL="$API_URL" SUPABASE_ANON_KEY="$ANON_KEY"
-          pnpm --filter @compara/api build
-          pnpm --filter @compara/frontend build
-          pnpm --filter @compara/frontend test:e2e
+          pnpm --filter comparamercado-back build:api
+          pnpm --filter comparamercado-front build
+          pnpm --filter comparamercado-front test:e2e
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: playwright-report
-          path: frontend/playwright-report
+          path: ComparaMercado-Front/playwright-report
           retention-days: 7

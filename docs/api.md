@@ -1,16 +1,16 @@
 # API e contratos
 
-A API HTTP do back-end (`backend/apps/api`) é a **fronteira oficial** entre o front-end e os dados. O contrato vive em [`shared/contracts`](../shared/contracts/src/index.ts): rotas (`apiRoutes`), schemas Zod e tipos. O back-end valida o que recebe; o front-end valida o que lê. Versão atual: `CONTRACT_VERSION = "2.0.0"`. Racional em [ADR-0005](adr/0005-separacao-frontend-backend.md).
+A API HTTP do back-end (`ComparaMercado-Back`, ponto de entrada `src/index.ts`) é a **fronteira oficial** entre o front-end e os dados. O contrato vive em [`ComparaMercado-Back/src/contracts`](../ComparaMercado-Back/src/contracts/index.ts): rotas (`apiRoutes`), schemas Zod e tipos. O back-end valida o que recebe; o front-end valida o que lê. Versão atual: `CONTRACT_VERSION = "2.0.0"`. Racional em [ADR-0005](adr/0005-separacao-frontend-backend.md).
 
 ## Quem fala com quem
 
-| Fronteira                 | Meio                                           | Autenticação                               |
-| ------------------------- | ---------------------------------------------- | ------------------------------------------ |
-| Navegador → servidor Next | páginas, Server Actions                        | cookie `httpOnly` do Supabase Auth         |
-| Servidor Next → API       | HTTP/JSON, schemas de `shared/contracts`       | `Authorization: Bearer <token do usuário>` |
-| API → Postgres            | PostgREST/RPC, chave `anon` + token do usuário | RLS avalia a identidade do usuário         |
-| Worker → Postgres         | `service_role` (ignora RLS)                    | chave só no ambiente do worker             |
-| Fila                      | pg-boss (tabelas no Postgres)                  | acesso só pelo worker                      |
+| Fronteira                 | Meio                                                      | Autenticação                               |
+| ------------------------- | --------------------------------------------------------- | ------------------------------------------ |
+| Navegador → servidor Next | páginas, Server Actions                                   | cookie `httpOnly` do Supabase Auth         |
+| Servidor Next → API       | HTTP/JSON, schemas de `ComparaMercado-Back/src/contracts` | `Authorization: Bearer <token do usuário>` |
+| API → Postgres            | PostgREST/RPC, chave `anon` + token do usuário            | RLS avalia a identidade do usuário         |
+| Worker → Postgres         | `service_role` (ignora RLS)                               | chave só no ambiente do worker             |
+| Fila                      | pg-boss (tabelas no Postgres)                             | acesso só pelo worker                      |
 
 O navegador não conhece a URL da API nem o token. A proteção de rota no front (`/admin`) é conveniência de interface: **a autorização real é da API** (papel `admin`) e, por baixo, da RLS.
 
@@ -61,10 +61,10 @@ O front trata indisponibilidade da API (`ApiUnavailableError`, tempo limite de 1
 
 ## Como evoluir o contrato
 
-1. Mudança **compatível** (campo opcional novo, endpoint novo): altere `shared/contracts`, a rota e o serviço; suba o _minor_ de `CONTRACT_VERSION`.
+1. Mudança **compatível** (campo opcional novo, endpoint novo): altere `ComparaMercado-Back/src/contracts`, a rota e o serviço; suba o _minor_ de `CONTRACT_VERSION`.
 2. Mudança **incompatível** (remover/renomear campo, mudar tipo): suba o _major_ e migre API e front **no mesmo PR** (o monorepo permite). Ordem de implantação: banco → API → front.
 3. O compilador acusa qualquer mapeador do `db` que divirja do contrato; os testes da API validam as respostas reais com os schemas; `pnpm arch:check` acusa import fora de lugar.
-4. OpenAPI: não é gerado hoje (um único cliente, que usa os próprios schemas Zod). Gere a partir de `shared/contracts` quando surgir um cliente externo.
+4. OpenAPI: não é gerado hoje (um único cliente, que usa os próprios schemas Zod). Gere a partir de `ComparaMercado-Back/src/contracts` quando surgir um cliente externo.
 
 ## Limitações conhecidas
 

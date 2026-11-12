@@ -1,0 +1,36 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Back (API :4000)",
+      "type": "shell",
+      "command": "pnpm dev:back",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated", "group": "dev", "reveal": "always" }
+    },
+    {
+      "label": "Front (Next :3000)",
+      "type": "shell",
+      "command": "pnpm dev:front",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated", "group": "dev", "reveal": "always" }
+    },
+    {
+      "label": "Worker (ingestão)",
+      "type": "shell",
+      "command": "pnpm dev:worker",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated", "group": "dev", "reveal": "always" }
+    },
+    {
+      "label": "Iniciar Back + Front",
+      "dependsOn": ["Back (API :4000)", "Front (Next :3000)"],
+      "dependsOrder": "parallel",
+      "problemMatcher": [],
+      "group": { "kind": "build", "isDefault": true }
+    }
+  ]
+}

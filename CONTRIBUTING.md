@@ -17,15 +17,15 @@ Settings → Branches → regra para `main`: exigir PR, exigir os checks **quali
 ## Padrões de código
 
 - TypeScript estrito, **sem `any`** (Biome barra). Sem `!` (non-null assertion).
-- Regras de negócio em `backend/packages/domain`: puras, sem banco/rede, com testes.
-- Zod em toda entrada externa: formulários, rotas da API (`shared/contracts`), RPCs, saída da IA. Mudou o formato de uma resposta ou requisição? Atualize `shared/contracts` e `CONTRACT_VERSION`.
+- Regras de negócio em `ComparaMercado-Back/src/lib` e nos `service/` puros: puras, sem banco/rede, com testes.
+- Zod em toda entrada externa: formulários, rotas da API (`ComparaMercado-Back/src/contracts`), RPCs, saída da IA. Mudou o formato de uma resposta ou requisição? Atualize `ComparaMercado-Back/src/contracts` e `CONTRACT_VERSION`.
 - Dinheiro em **centavos inteiros**; datas em UTC (`timestamptz`); texto de UI em pt-BR.
 - Erros tipados; logs estruturados (pino) com `correlationId`; **nunca** logar dado pessoal, chave ou arquivo bruto.
 - UI: a partir de 360 px, alvos ≥ 44 px, estados vazio/erro/carregamento, WCAG AA, claro e escuro.
 
 ## Banco de dados
 
-1. Crie migração em `backend/supabase/migrations/<timestamp>_descricao.sql` (nunca edite migração já aplicada em staging/produção).
+1. Crie migração em `ComparaMercado-Back/supabase/migrations/<timestamp>_descricao.sql` (nunca edite migração já aplicada em staging/produção).
 2. **Toda tabela nova: `enable row level security` + políticas explícitas + `grant` mínimo + teste pgTAP.**
 3. `pnpm db:reset && pnpm db:test && pnpm db:types`.
 4. Migração destrutiva ou lenta? Descreva o plano de rollback no PR. Nada de alteração manual em produção.

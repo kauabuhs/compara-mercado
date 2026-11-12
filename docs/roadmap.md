@@ -67,10 +67,10 @@ Metas do plano (a calibrar com dados reais): 50 usuários ativos/semana · ≥ 7
 
 ## Separação front-end / back-end (2026-11-11)
 
-Feito e verificado: layout `frontend/` · `backend/` · `shared/`; **API HTTP** (`backend/apps/api`, Hono) com autenticação por token, autorização por papel e RLS; contratos Zod em `shared/contracts` (v2.0.0); front sem acesso a dados (cliente tipado da API); Dockerfiles de API e worker; CI com jobs por lado; `arch:check` com 9 regras. Detalhes no [ADR-0005](adr/0005-separacao-frontend-backend.md).
+Feito e verificado: layout `ComparaMercado-Front/` · `ComparaMercado-Back/` ([ADR-0007](adr/0007-layout-front-back-por-aplicacao.md)); **API HTTP** (`ComparaMercado-Back`, Hono) com autenticação por token, autorização por papel e RLS; contratos Zod em `ComparaMercado-Back/src/contracts` (v2.0.0); front sem acesso a dados (cliente tipado da API); Dockerfiles de API e worker; CI com jobs por lado; `arch:check` com 9 regras. Detalhes no [ADR-0005](adr/0005-separacao-frontend-backend.md).
 Em aberto: host da API e do worker; upload de arquivos da Fase 2 como endpoint da API; cache/rate limit compartilhados entre instâncias.
 
 ## Reestruturação arquitetural (2026-11-10)
 
-Feito e verificado: pacote `@compara/contracts`; front por funcionalidade (`features/`, `shared/`); `pnpm arch:check` na CI (7 regras, testadas com violações injetadas); [ADR-0004](adr/0004-fronteiras-e-contratos.md) e [`api.md`](api.md).
+Feito e verificado: contratos Zod compartilhados (hoje `ComparaMercado-Back/src/contracts`); front por funcionalidade (hoje `modules/`); `pnpm arch:check` na CI (7 regras, testadas com violações injetadas); [ADR-0004](adr/0004-fronteiras-e-contratos.md) e [`api.md`](api.md).
 Em aberto: decidir a superfície de upload da Fase 2 sem `service_role` no web (ADR-0004); gerar OpenAPI só se surgir cliente HTTP externo.
