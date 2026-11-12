@@ -34,7 +34,8 @@ export function catalogRoutes({ catalog, compareRateLimiter }: CatalogRoutesDeps
 
   routes.get(apiRoutes.searchProducts, publicReadCache(), async (c) => {
     const query = parseQuery(c, SearchProductsQuerySchema);
-    return c.json({ hits: await catalog.searchProducts(query) });
+    const { items, total } = await catalog.searchProducts(query);
+    return c.json({ hits: items, total, page: query.page, pageSize: query.pageSize });
   });
 
   routes.get(apiRoutes.productDetails(":productId"), publicReadCache(), async (c) => {
@@ -46,7 +47,8 @@ export function catalogRoutes({ catalog, compareRateLimiter }: CatalogRoutesDeps
 
   routes.get(apiRoutes.offers, publicReadCache(), async (c) => {
     const query = parseQuery(c, OffersQuerySchema);
-    return c.json({ offers: await catalog.listOffers(query) });
+    const { items, total } = await catalog.listOffers(query);
+    return c.json({ offers: items, total, page: query.page, pageSize: query.pageSize });
   });
 
   routes.get(apiRoutes.stores, responseCache({ ttlSeconds: STORES_CACHE_SECONDS }), async (c) => {

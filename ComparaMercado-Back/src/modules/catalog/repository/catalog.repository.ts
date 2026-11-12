@@ -1,6 +1,8 @@
 import { z } from "zod";
+import type { OffersSort, PriceOfferBase, ProductHit } from "../../../contracts";
 import { DbError } from "../../../database/errors";
 import type { Db } from "../../../database/supabase";
+import type { Paged } from "../../../lib/pagination";
 import type { ListItem } from "../service/compare";
 import {
   CompareResultSchema,
@@ -23,10 +25,43 @@ function unwrap<T>(productResult: {
   return productResult.data;
 }
 
-/** Busca com tolerância a erro de digitação e sem acento (pg_trgm). */
-export async function searchProducts(db: Db, query: string, limit = 20) {
-  const rows = unwrap(await db.rpc("search_products", { p_query: query, p_limit: limit }));
-  return z.array(ProductHitSchema).parse(rows);
+const TotalRowsSchema = z.array(z.object({ total_count: z.coerce.number().int() }));
+
+/**
+ * Total de uma listagem paginada. Cada linha da página traz `total_count`; numa página além do
+ * fim não há linhas, então uma consulta mínima da primeira página informa o total real (a
+ * interface usa isso para levar o usuário à última página em vez de mostrar "0 resultados").
+ */
+async function totalOf(
+  pageRows: readonly unknown[],
+  offset: number,
+  firstRow: () => Promise<readonly unknown[]>,
+): Promise<number> {
+  const rows = pageRows.length === 0 && offset > 0 ? await firstRow() : pageRows;
+  return TotalRowsSchema.parse(rows)[0]?.total_count ?? 0;
+}
+
+/** Busca com tolerância a erro de digitação e sem acento (pg_trgm), paginada no banco. */
+export async function searchProducts(
+  db: Db,
+  query: string,
+  options: { limit?: number; offset?: number; onlyPriced?: boolean } = {},
+): Promise<Paged<ProductHit>> {
+  const { limit = 20, offset = 0, onlyPriced = false } = options;
+  const call = async (pageLimit: number, pageOffset: number) =>
+    unwrap(
+      await db.rpc("search_products_page", {
+        p_query: query,
+        p_limit: pageLimit,
+        p_offset: pageOffset,
+        p_only_priced: onlyPriced,
+      }),
+    );
+  const rows = await call(limit, offset);
+  return {
+    items: z.array(ProductHitSchema).parse(rows),
+    total: await totalOf(rows, offset, () => call(1, 0)),
+  };
 }
 
 /** Preço do produto em cada mercado, do mais barato (por unidade base) ao mais caro. */
@@ -41,16 +76,37 @@ export async function getProductPrices(db: Db, productId: string) {
   return z.array(PriceOfferSchema).parse(rows);
 }
 
-/** Ofertas vigentes (promoções com validade), das que vencem primeiro às mais longas. */
-export async function listOffers(db: Db, options: { storeId?: string; limit?: number } = {}) {
-  let query = db.from("price_board").select("*").eq("promo", true);
-  if (options.storeId) query = query.eq("store_id", options.storeId);
-  const rows = unwrap(
-    await query
-      .order("valid_to", { ascending: true, nullsFirst: false })
-      .limit(options.limit ?? 60),
-  );
-  return z.array(PriceOfferSchema).parse(rows);
+export interface ListOffersOptions {
+  storeId?: string;
+  query?: string;
+  sort?: OffersSort;
+  expiringSoon?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+/** Ofertas vigentes (promoções): busca, filtro, ordenação e página decididos no banco. */
+export async function listOffers(
+  db: Db,
+  options: ListOffersOptions = {},
+): Promise<Paged<PriceOfferBase>> {
+  const { limit = 20, offset = 0 } = options;
+  const call = async (pageLimit: number, pageOffset: number) =>
+    unwrap(
+      await db.rpc("list_offers_page", {
+        ...(options.storeId ? { p_store_id: options.storeId } : {}),
+        ...(options.query ? { p_query: options.query } : {}),
+        p_expiring: options.expiringSoon ?? false,
+        p_sort: options.sort ?? "featured",
+        p_limit: pageLimit,
+        p_offset: pageOffset,
+      }),
+    );
+  const rows = await call(limit, offset);
+  return {
+    items: z.array(PriceOfferSchema).parse(rows),
+    total: await totalOf(rows, offset, () => call(1, 0)),
+  };
 }
 
 /** Produto ativo por id; null se não existe (ou está arquivado). */

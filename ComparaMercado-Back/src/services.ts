@@ -6,6 +6,9 @@ import { createAuthenticator } from "./modules/auth/service/auth.service";
 import { withAuthCache } from "./modules/auth/service/cached-authenticator";
 import type { CatalogService } from "./modules/catalog/catalog.types";
 import { createCatalogService } from "./modules/catalog/service/catalog.service";
+import type { ContributionServiceFactory } from "./modules/contributions/contributions.types";
+import { createContributionRepository } from "./modules/contributions/repository/contributions.repository";
+import { createContributionService } from "./modules/contributions/service/contributions.service";
 
 /**
  * Raiz de composição da API: reúne os serviços de cada módulo. As rotas recebem só a porta de
@@ -15,6 +18,7 @@ export interface Services {
   catalog: CatalogService;
   authenticator: Authenticator;
   adminFor: AdminServiceFactory;
+  contributionsFor: ContributionServiceFactory;
 }
 
 export interface SupabaseServicesConfig {
@@ -32,5 +36,12 @@ export function createSupabaseServices(config: SupabaseServicesConfig): Services
     authenticator: withAuthCache(createAuthenticator(config, publicDb)),
     adminFor: (accessToken) =>
       createAdminService(createUserClient(config.supabaseUrl, config.supabaseAnonKey, accessToken)),
+    contributionsFor: (accessToken) =>
+      createContributionService(
+        createContributionRepository(
+          createUserClient(config.supabaseUrl, config.supabaseAnonKey, accessToken),
+        ),
+        { now },
+      ),
   };
 }

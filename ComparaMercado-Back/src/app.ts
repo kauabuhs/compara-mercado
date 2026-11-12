@@ -13,10 +13,12 @@ import { RateLimiter } from "./middlewares/rate-limit";
 import { adminRoutes } from "./modules/admin/controller/admin.controller";
 import { accountRoutes } from "./modules/auth/controller/auth.controller";
 import { catalogRoutes } from "./modules/catalog/controller/catalog.controller";
+import { contributionRoutes } from "./modules/contributions/controller/contributions.controller";
 import type { Services } from "./services";
 
 const MAX_BODY_BYTES = 64 * 1024;
 const COMPARE_MAX_REQUESTS_PER_MINUTE = 30;
+const SUBMIT_MAX_REQUESTS_PER_MINUTE = 6;
 const REQUEST_ID_PATTERN = /^[\w-]{8,64}$/;
 
 export interface AppDependencies {
@@ -24,10 +26,17 @@ export interface AppDependencies {
   logger: Logger;
   /** Permite ajustar o limite em testes; em produção usa o padrão. */
   compareRateLimiter?: RateLimiter;
+  /** Idem, para o envio de preço com foto (limite por usuário). */
+  submitRateLimiter?: RateLimiter;
 }
 
 /** Monta a API. Não abre porta nem lê ambiente: quem sobe o servidor é o `main.ts`. */
-export function createApp({ services, logger, compareRateLimiter }: AppDependencies) {
+export function createApp({
+  services,
+  logger,
+  compareRateLimiter,
+  submitRateLimiter,
+}: AppDependencies) {
   const app = new Hono<AppEnv>();
 
   app.use(secureHeaders());
@@ -52,13 +61,17 @@ export function createApp({ services, logger, compareRateLimiter }: AppDependenc
       "requisição",
     );
   });
-  app.use(
-    bodyLimit({
-      maxSize: MAX_BODY_BYTES,
-      onError: () => {
-        throw new ApiError(413, "payload_too_large", "Requisição grande demais.");
-      },
-    }),
+  const defaultBodyLimit = bodyLimit({
+    maxSize: MAX_BODY_BYTES,
+    onError: () => {
+      throw new ApiError(413, "payload_too_large", "Requisição grande demais.");
+    },
+  });
+  // O envio de foto tem limite próprio (maior), aplicado dentro da rota; as demais ficam em 64 KB.
+  app.use(async (c, next) =>
+    c.req.method === "POST" && c.req.path === apiRoutes.contributions
+      ? next()
+      : defaultBodyLimit(c, next),
   );
 
   app.get(apiRoutes.health, (c) => c.json({ status: "ok" }));
@@ -75,6 +88,15 @@ export function createApp({ services, logger, compareRateLimiter }: AppDependenc
   app.route(
     "/",
     adminRoutes({ authenticator: services.authenticator, adminFor: services.adminFor }),
+  );
+  app.route(
+    "/",
+    contributionRoutes({
+      authenticator: services.authenticator,
+      contributionsFor: services.contributionsFor,
+      submitRateLimiter:
+        submitRateLimiter ?? new RateLimiter(SUBMIT_MAX_REQUESTS_PER_MINUTE, 60_000),
+    }),
   );
 
   app.notFound((c) => c.json(errors.notFound("Rota não encontrada.").toBody(), 404));

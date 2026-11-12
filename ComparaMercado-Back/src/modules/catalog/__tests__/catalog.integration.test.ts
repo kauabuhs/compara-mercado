@@ -32,16 +32,30 @@ describe.skipIf(!url || !key)(
     });
 
     it("busca tolera erro de digitação e acento", async () => {
-      const hits = await searchProducts(db, "feijao");
+      const { items: hits } = await searchProducts(db, "feijao");
       expect(hits.map((hit) => hit.name)).toEqual(
         expect.arrayContaining(["Feijão preto", "Feijão carioca"]),
       );
-      const typo = await searchProducts(db, "arroz parboilisado");
+      const { items: typo } = await searchProducts(db, "arroz parboilisado");
       expect(typo[0]?.name).toBe("Arroz parboilizado");
     });
 
+    it("pagina a busca: total fixo, páginas sem sobreposição e página além do fim", async () => {
+      const first = await searchProducts(db, "arroz", { limit: 1, offset: 0 });
+      const second = await searchProducts(db, "arroz", { limit: 1, offset: 1 });
+      expect(first.total).toBeGreaterThan(1);
+      expect(second.total).toBe(first.total);
+      expect(second.items[0]?.productId).not.toBe(first.items[0]?.productId);
+
+      const beyond = await searchProducts(db, "arroz", { limit: 10, offset: 10_000 });
+      expect(beyond.items).toHaveLength(0);
+      expect(beyond.total).toBe(first.total); // o total real, para a UI voltar à última página
+    });
+
     it("devolve preços por mercado ordenados pelo preço por unidade base", async () => {
-      const [arroz] = await searchProducts(db, "arroz branco");
+      const {
+        items: [arroz],
+      } = await searchProducts(db, "arroz branco");
       expect(arroz).toBeDefined();
       const prices = await getProductPrices(db, arroz?.productId ?? "");
       expect(prices.length).toBeGreaterThanOrEqual(4);
@@ -51,19 +65,36 @@ describe.skipIf(!url || !key)(
     });
 
     it("lista ofertas e histórico sem expor contribuidores", async () => {
-      const offers = await listOffers(db);
+      const { items: offers } = await listOffers(db);
       expect(offers.every((offer) => offer.promo)).toBe(true);
-      const [leite] = await searchProducts(db, "leite integral");
+      const {
+        items: [leite],
+      } = await searchProducts(db, "leite integral");
       const history = await getPriceHistory(db, leite?.productId ?? "");
       expect(history.length).toBeGreaterThan(0);
       expect(Object.keys(history[0] ?? {})).not.toContain("createdBy");
+    });
+
+    it("pagina ofertas: filtro por mercado, ordenação por preço e total coerente", async () => {
+      const all = await listOffers(db, { limit: 50, sort: "price" });
+      expect(all.total).toBeGreaterThanOrEqual(all.items.length);
+      const units = all.items.map((offer) => offer.unitPriceCents);
+      expect(units).toEqual([...units].sort((a, b) => a - b));
+
+      const storeId = all.items[0]?.storeId ?? "";
+      const byStore = await listOffers(db, { storeId, limit: 50 });
+      expect(byStore.items.length).toBeGreaterThan(0);
+      expect(byStore.items.every((offer) => offer.storeId === storeId)).toBe(true);
+      expect(byStore.total).toBeLessThanOrEqual(all.total);
     });
 
     it("compare_list no SQL bate com compareList do domínio (paridade)", async () => {
       const names = ["arroz branco", "feijao preto", "leite integral", "cafe", "banana"];
       const items = [];
       for (const n of names) {
-        const [hit] = await searchProducts(db, n, 1);
+        const {
+          items: [hit],
+        } = await searchProducts(db, n, { limit: 1 });
         if (hit) items.push({ productId: hit.productId, quantity: 2 });
       }
       expect(items).toHaveLength(5);

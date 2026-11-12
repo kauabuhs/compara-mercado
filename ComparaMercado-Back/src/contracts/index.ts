@@ -10,7 +10,7 @@
 import { z } from "zod";
 
 /** Versão do contrato. Suba a maior em mudanças incompatíveis. */
-export const CONTRACT_VERSION = "2.0.0";
+export const CONTRACT_VERSION = "3.1.0";
 
 // ── Rotas da API (v1) ──────────────────────────────────────────────────────────────────────────
 
@@ -28,6 +28,11 @@ export const apiRoutes = {
   adminCreatePrice: "/v1/admin/prices",
   adminReviewObservation: (observationId: string) =>
     `/v1/admin/observations/${observationId}/review`,
+  /** Foto da etiqueta de um envio (bytes JPEG), só para o admin que revisa. */
+  adminObservationPhoto: (observationId: string) => `/v1/admin/observations/${observationId}/photo`,
+  /** Envio de preço com foto (multipart) por usuário logado. */
+  contributions: "/v1/contributions",
+  myContributions: "/v1/me/contributions",
 } as const;
 
 // ── Tipos primitivos ───────────────────────────────────────────────────────────────────────────
@@ -157,13 +162,34 @@ export type ListComparison = z.infer<typeof ListComparisonSchema>;
 
 // ── Catálogo, ofertas e mercados (públicos) ────────────────────────────────────────────────────
 
+/** Tamanho de página padrão das listagens (e o máximo que a API aceita). */
+export const DEFAULT_PAGE_SIZE = 20;
+export const MAX_PAGE_SIZE = 50;
+
+/** Paginação numerada: `page` começa em 1; `pageSize` é limitado para proteger o banco. */
+const PageSchema = z.coerce.number().int().min(1).max(10_000).default(1);
+const PageSizeSchema = z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE);
+
+/** Parte comum de toda resposta paginada: `total` é a contagem com os filtros aplicados. */
+const PageInfoShape = {
+  total: z.number().int().min(0),
+  page: z.number().int().min(1),
+  pageSize: z.number().int().min(1),
+};
+
 export const SearchProductsQuerySchema = z.object({
   q: z.string().trim().min(2).max(80),
-  limit: z.coerce.number().int().min(1).max(50).default(30),
+  page: PageSchema,
+  pageSize: PageSizeSchema,
+  /** Só produtos com preço vigente em algum mercado (`1`/`true`). */
+  onlyPriced: z.stringbool().default(false),
 });
 export type SearchProductsQuery = z.infer<typeof SearchProductsQuerySchema>;
 
-export const SearchProductsResponseSchema = z.object({ hits: z.array(ProductHitSchema) });
+export const SearchProductsResponseSchema = z.object({
+  hits: z.array(ProductHitSchema),
+  ...PageInfoShape,
+});
 export type SearchProductsResponse = z.infer<typeof SearchProductsResponseSchema>;
 
 export const ProductDetailsSchema = z.object({
@@ -173,13 +199,26 @@ export const ProductDetailsSchema = z.object({
 });
 export type ProductDetails = z.infer<typeof ProductDetailsSchema>;
 
+/** Ordenação das ofertas: destaque (relevância com busca; senão, a que vence primeiro), etc. */
+export const OffersSortSchema = z.enum(["featured", "price", "validity", "recent"]);
+export type OffersSort = z.infer<typeof OffersSortSchema>;
+
 export const OffersQuerySchema = z.object({
   storeId: z.uuid().optional(),
-  limit: z.coerce.number().int().min(1).max(100).default(60),
+  /** Busca por produto, marca ou mercado (sem acento, tolera erro de digitação). */
+  q: z.string().trim().max(80).optional(),
+  sort: OffersSortSchema.default("featured"),
+  /** Só as que vencem em até 3 dias (`1`/`true`). */
+  expiring: z.stringbool().default(false),
+  page: PageSchema,
+  pageSize: PageSizeSchema,
 });
 export type OffersQuery = z.infer<typeof OffersQuerySchema>;
 
-export const OffersResponseSchema = z.object({ offers: z.array(PriceOfferSchema) });
+export const OffersResponseSchema = z.object({
+  offers: z.array(PriceOfferSchema),
+  ...PageInfoShape,
+});
 export type OffersResponse = z.infer<typeof OffersResponseSchema>;
 
 export const StoresQuerySchema = z.object({ cityId: z.uuid().optional() });
@@ -240,13 +279,21 @@ export const PendingObservationSchema = z.object({
   productName: z.string().nullable(),
   storeName: z.string().nullable(),
   source: z.string(),
+  /** Confiança da leitura automática; 0 em envios feitos por pessoas (ainda não avaliados). */
   confidence: z.number().nullable(),
   priceCents: z.number().int(),
+  /** Existe foto da etiqueta para conferir (busque os bytes em `adminObservationPhoto`). */
+  hasPhoto: z.boolean(),
+  createdAt: z.string(),
 });
 export type PendingObservation = z.infer<typeof PendingObservationSchema>;
 
+export const ReviewQueueQuerySchema = z.object({ page: PageSchema, pageSize: PageSizeSchema });
+export type ReviewQueueQuery = z.infer<typeof ReviewQueueQuerySchema>;
+
 export const ReviewQueueResponseSchema = z.object({
   observations: z.array(PendingObservationSchema),
+  ...PageInfoShape,
 });
 export type ReviewQueueResponse = z.infer<typeof ReviewQueueResponseSchema>;
 
@@ -269,6 +316,53 @@ export type ReviewDecision = z.infer<typeof ReviewDecisionSchema>;
 
 export const ReviewObservationRequestSchema = z.object({ decision: ReviewDecisionSchema });
 export type ReviewObservationRequest = z.infer<typeof ReviewObservationRequestSchema>;
+
+// ── Contribuição de preços com foto (usuário logado) ───────────────────────────────────────────
+
+/** Teto do arquivo da foto. O navegador já comprime (~1,5 MB); o resto é folga. */
+export const MAX_CONTRIBUTION_PHOTO_BYTES = 5 * 1024 * 1024;
+
+/**
+ * Campos de texto do envio (multipart: tudo chega como string; a foto vai no campo `photo`).
+ * O preço máximo é de supermercado: acima disso quase certamente é erro de digitação.
+ */
+export const ContributionFieldsSchema = z.object({
+  storeId: z.uuid(),
+  productId: z.uuid(),
+  priceCents: z.coerce.number().int().min(1).max(1_000_000),
+  promo: z.stringbool().default(false),
+});
+export type ContributionFields = z.infer<typeof ContributionFieldsSchema>;
+
+export const ContributionCreatedSchema = z.object({
+  id: z.uuid(),
+  status: z.literal("pending"),
+});
+export type ContributionCreated = z.infer<typeof ContributionCreatedSchema>;
+
+export const ContributionStatusSchema = z.enum(["pending", "approved", "rejected", "superseded"]);
+export type ContributionStatus = z.infer<typeof ContributionStatusSchema>;
+
+/** Um envio do próprio usuário, com o andamento da análise. */
+export const MyContributionSchema = z.object({
+  id: z.uuid(),
+  productName: z.string().nullable(),
+  storeName: z.string().nullable(),
+  priceCents: z.number().int(),
+  promo: z.boolean(),
+  status: ContributionStatusSchema,
+  createdAt: z.string(),
+});
+export type MyContribution = z.infer<typeof MyContributionSchema>;
+
+export const MyContributionsQuerySchema = z.object({ page: PageSchema, pageSize: PageSizeSchema });
+export type MyContributionsQuery = z.infer<typeof MyContributionsQuerySchema>;
+
+export const MyContributionsResponseSchema = z.object({
+  contributions: z.array(MyContributionSchema),
+  ...PageInfoShape,
+});
+export type MyContributionsResponse = z.infer<typeof MyContributionsResponseSchema>;
 
 // ── Erros e envelopes ──────────────────────────────────────────────────────────────────────────
 

@@ -140,6 +140,7 @@ const PURE_FILES = new Set([
     (name) => `${BACK_SRC}/lib/${name}.ts`,
   ),
   `${BACK_SRC}/modules/catalog/service/compare.ts`,
+  `${BACK_SRC}/modules/contributions/service/jpeg.ts`,
   ...["golden", "match", "publish", "trigram", "validate"].map(
     (name) => `${BACK_SRC}/modules/ingest/service/${name}.ts`,
   ),

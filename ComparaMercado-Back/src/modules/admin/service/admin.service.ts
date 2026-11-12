@@ -1,6 +1,7 @@
 import type { PendingObservation, SizeUnit } from "../../../contracts";
 import { DbError } from "../../../database/errors";
 import type { Db } from "../../../database/supabase";
+import { pageOffset } from "../../../lib/pagination";
 import type { AdminService } from "../admin.types";
 
 // Ofertas valem até o fim do dia, no horário de Brasília.
@@ -53,26 +54,35 @@ export function createAdminService(userDb: Db): AdminService {
       };
     },
 
-    async getReviewQueue() {
-      const { data, error } = await userDb
+    async getReviewQueue({ page, pageSize }) {
+      const from = pageOffset(page, pageSize);
+      const { data, error, count } = await userDb
         .from("price_observations")
         .select(
-          "id,price_cents,unit_price_cents,promo,source,confidence,observed_at,stores(name),products(canonical_name,brand)",
+          "id,price_cents,unit_price_cents,promo,source,confidence,observed_at,created_at,sources(kind),stores(name),products(canonical_name,brand)",
+          { count: "exact" },
         )
         .eq("status", "pending")
+        // `id` desempata observações criadas no mesmo instante: a página 2 nunca repete a 1
         .order("created_at", { ascending: true })
-        .limit(50);
+        .order("id", { ascending: true })
+        .range(from, from + pageSize - 1);
       throwIfError("getReviewQueue", error);
-      return (data ?? []).map(
-        (row): PendingObservation => ({
-          id: row.id,
-          productName: row.products?.canonical_name ?? null,
-          storeName: row.stores?.name ?? null,
-          source: row.source,
-          confidence: row.confidence === null ? null : Number(row.confidence),
-          priceCents: row.price_cents,
-        }),
-      );
+      return {
+        total: count ?? 0,
+        items: (data ?? []).map(
+          (row): PendingObservation => ({
+            id: row.id,
+            productName: row.products?.canonical_name ?? null,
+            storeName: row.stores?.name ?? null,
+            source: row.source,
+            confidence: row.confidence === null ? null : Number(row.confidence),
+            priceCents: row.price_cents,
+            hasPhoto: row.sources?.kind === "label",
+            createdAt: row.created_at,
+          }),
+        ),
+      };
     },
 
     async createManualPrice(request, adminUserId) {
@@ -102,6 +112,27 @@ export function createAdminService(userDb: Db): AdminService {
       if (!decided?.length) return false;
       if (decision === "approved") await userDb.rpc("refresh_current_prices");
       return true;
+    },
+
+    async getObservationPhoto(observationId) {
+      const { data, error } = await userDb
+        .from("price_observations")
+        .select("sources(kind,file_path)")
+        .eq("id", observationId)
+        .maybeSingle();
+      throwIfError("getObservationPhoto", error);
+      const source = data?.sources;
+      // Só fotos de etiqueta moram no bucket privado `contributions` (encartes são outro fluxo).
+      if (source?.kind !== "label") return null;
+      const { data: file, error: downloadError } = await userDb.storage
+        .from("contributions")
+        .download(source.file_path);
+      if (downloadError) {
+        throw new DbError(`getObservationPhoto.download: ${downloadError.message}`, undefined, {
+          cause: downloadError,
+        });
+      }
+      return new Uint8Array(await file.arrayBuffer());
     },
   };
 }
