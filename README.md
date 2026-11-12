@@ -54,8 +54,10 @@ Atalhos: `pnpm dev:abas` abre o Windows Terminal com uma aba por processo (`-- -
 
 Login de admin local (só desenvolvimento): `admin@local.test` / `admin123456`. Os e-mails de login caem no Mailpit em http://127.0.0.1:54324. Acesse sempre por `localhost`, não `127.0.0.1` (o cookie do PKCE é por host).
 
-> Se o Studio do Supabase falhar o healthcheck, suba sem os serviços opcionais:
-> `pnpm exec supabase start --workdir ComparaMercado-Back -x studio,imgproxy,edge-runtime,logflare,vector,supavisor`
+> O stack local sobe só o necessário (6 contêineres: Postgres, Kong, PostgREST, Auth, Storage e Mailpit).
+> Studio, Realtime, Edge Runtime e Analytics ficam desligados em `ComparaMercado-Back/supabase/config.toml`
+> (nada no projeto os usa). Para inspecionar o banco: `psql postgresql://postgres:postgres@127.0.0.1:54322/postgres`.
+> O projeto não usa Redis: cache e rate limit são em memória e a fila (pg-boss) roda no próprio Postgres.
 
 ## Comandos
 

@@ -46,7 +46,8 @@ Metas do plano (a calibrar com dados reais): 50 usuários ativos/semana · ≥ 7
 **Critério:** decisão sobre NFC-e em ADR; nenhum preço fraudulento no teste de abuso.
 
 - ✅ Base no banco: contribuição nasce `pending`, limite diário (30), imutabilidade, auditoria
-- ⬜ Foto de etiqueta (câmera, leitura por IA, confirmação em 2 toques), reputação e pontos
+- ✅ **MVP de contribuição** ([ADR-0008](adr/0008-contribuicao-de-precos-com-foto.md)): `/contribuir` com foto obrigatória (comprimida no navegador, sanitizada na API, bucket privado), `/conta/envios`, revisão do admin com a foto ao lado do dado. Tudo vai para revisão humana; **falta rodar o beta fechado (2 semanas, 10–20 pessoas)** e medir adesão, aprovação e tempo de revisão antes de construir o resto
+- ⬜ Leitura da etiqueta por IA e confirmação em 2 toques, reputação e pontos, publicação automática (só depois de validar o MVP)
 - ⬜ Teste de abuso; spike NFC-e (técnico + jurídico) → ADR
 
 ## Fase 4 — Beta
