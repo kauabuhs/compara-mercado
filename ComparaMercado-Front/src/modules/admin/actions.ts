@@ -84,5 +84,10 @@ export async function reviewObservation(
     if (isAuthorizationFailure(error)) throw new Error("não autorizado");
     throw new Error("falha ao revisar");
   }
+  // Aprovar publica o preço: zera o cache do catálogo para ele aparecer nas páginas públicas já.
+  if (safeDecision === "approved") {
+    updateTag(CATALOG_CACHE_TAG);
+    revalidatePath("/", "layout");
+  }
   revalidatePath("/admin");
 }

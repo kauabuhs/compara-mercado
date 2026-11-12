@@ -1,121 +1,100 @@
 "use client";
 
-import type { PriceOffer } from "@contracts";
-import { SearchX } from "lucide-react";
-import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import type { OffersSort, PriceOffer } from "@contracts";
+import { ChevronDown, SearchX, Store } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import { Chip, ChipRow, SearchField } from "@/components/ui/controls";
+import { Chip, ChipRow, chipClass, SearchField } from "@/components/ui/controls";
+import { Pagination } from "@/components/ui/pagination";
 import { EmptyState, Select } from "@/components/ui/primitives";
-import { searchItems } from "@/lib/search";
+import { PAGE_PARAM } from "@/lib/pagination";
+import { withParams } from "@/lib/search-params";
+import { cn } from "@/lib/utils";
 import { OfferCard } from "@/modules/offers/components/offer-card";
+import { type PickerStore, StorePicker } from "@/modules/offers/components/store-picker";
 
-type SortKey = "relevance" | "price" | "validity" | "recent";
-
-const SORT_OPTIONS: ReadonlyArray<{ value: SortKey; label: string }> = [
-  { value: "relevance", label: "Em destaque" },
+const SORT_OPTIONS: ReadonlyArray<{ value: OffersSort; label: string }> = [
+  { value: "featured", label: "Em destaque" },
   { value: "price", label: "Menor preço" },
   { value: "validity", label: "Vence primeiro" },
   { value: "recent", label: "Mais recentes" },
 ];
 
-const EXPIRING_SOON_DAYS = 3;
-const DAY_MS = 86_400_000;
+const SEARCH_DEBOUNCE_MS = 350;
+const numberFormatter = new Intl.NumberFormat("pt-BR");
 
-function isSortKey(value: string | null): value is SortKey {
-  return SORT_OPTIONS.some((option) => option.value === value);
+export interface OffersFilters {
+  q: string;
+  storeId: string | null;
+  expiring: boolean;
+  sort: OffersSort;
 }
 
-function isExpiringSoon(offer: PriceOffer, now: number): boolean {
-  if (!offer.validTo) return false;
-  const remaining = new Date(offer.validTo).getTime() - now;
-  return remaining >= 0 && remaining <= EXPIRING_SOON_DAYS * DAY_MS;
+interface OffersExplorerProps {
+  /** A página atual, já filtrada, ordenada e paginada pelo servidor. */
+  offers: readonly PriceOffer[];
+  total: number;
+  page: number;
+  pageSize: number;
+  stores: readonly PickerStore[];
+  filters: OffersFilters;
 }
 
-/** Estado inicial vindo da URL (links compartilháveis); igual no servidor e no navegador. */
-function readInitialParams(params: URLSearchParams) {
-  const sort = params.get("ordem");
-  return {
-    query: params.get("q") ?? "",
-    storeId: params.get("loja"),
-    expiring: params.get("vence") === "1",
-    sort: isSortKey(sort) ? sort : ("relevance" as SortKey),
-  };
-}
-
-export function OffersExplorer({ offers }: { offers: readonly PriceOffer[] }) {
+/**
+ * Ofertas com busca, ordenação, filtro de mercado e paginação. O ESTADO MORA NA URL
+ * (?q=&loja=&vence=&ordem=&pagina=): o servidor decide a página, o link é compartilhável e o botão
+ * voltar funciona. Aqui só ficam os controles; nada é filtrado no navegador, porque a cidade pode
+ * ter milhares de ofertas.
+ */
+export function OffersExplorer({
+  offers,
+  total,
+  page,
+  pageSize,
+  stores,
+  filters,
+}: OffersExplorerProps) {
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [initial] = useState(() => readInitialParams(searchParams));
-  const [query, setQuery] = useState(initial.query);
-  const [storeId, setStoreId] = useState<string | null>(initial.storeId);
-  const [expiringOnly, setExpiringOnly] = useState(initial.expiring);
-  const [sort, setSort] = useState<SortKey>(initial.sort);
+  const [isPending, startTransition] = useTransition();
+  const [query, setQuery] = useState(filters.q);
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const lastPushedQuery = useRef(filters.q);
 
-  // Mantém os filtros na URL (sem recarregar nem poluir o histórico): dá para copiar e compartilhar.
+  /** Troca os filtros na URL e volta para a página 1 (a página antiga não faz mais sentido). */
+  function navigate(updates: Record<string, string | null>) {
+    const href = `${pathname}${withParams(searchParams, { [PAGE_PARAM]: null, ...updates })}`;
+    startTransition(() => router.replace(href, { scroll: false }));
+  }
+
+  // Busca: espera o usuário parar de digitar antes de pedir ao servidor.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `navigate` muda a cada render; só `query` deve disparar
   useEffect(() => {
-    const url = new URL(window.location.href);
-    const entries: Array<[string, string | null]> = [
-      ["q", query.trim() || null],
-      ["loja", storeId],
-      ["vence", expiringOnly ? "1" : null],
-      ["ordem", sort === "relevance" ? null : sort],
-    ];
-    for (const [key, value] of entries) {
-      if (value) url.searchParams.set(key, value);
-      else url.searchParams.delete(key);
-    }
-    window.history.replaceState(window.history.state, "", url);
-  }, [query, storeId, expiringOnly, sort]);
+    const term = query.trim();
+    if (term === lastPushedQuery.current) return;
+    const timer = setTimeout(() => {
+      lastPushedQuery.current = term;
+      navigate({ q: term || null });
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query]);
 
-  // Busca por texto primeiro: os contadores de cada mercado refletem o que o usuário digitou.
-  const matchesQuery = useMemo(
-    () => searchItems(offers, query, (offer) => [offer.productName, offer.brand, offer.storeName]),
-    [offers, query],
-  );
-
-  const stores = useMemo(() => {
-    const counts = new Map<string, { id: string; name: string; count: number }>();
-    for (const offer of matchesQuery) {
-      const entry = counts.get(offer.storeId) ?? {
-        id: offer.storeId,
-        name: offer.storeName,
-        count: 0,
-      };
-      entry.count += 1;
-      counts.set(offer.storeId, entry);
-    }
-    // Mantém o mercado escolhido visível mesmo se a busca zerar as ofertas dele.
-    if (storeId !== null && !counts.has(storeId)) {
-      const sample = offers.find((offer) => offer.storeId === storeId);
-      if (sample) counts.set(storeId, { id: storeId, name: sample.storeName, count: 0 });
-    }
-    return [...counts.values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
-  }, [matchesQuery, offers, storeId]);
-
-  const visible = useMemo(() => {
-    const now = Date.now();
-    const filtered = matchesQuery.filter(
-      (offer) =>
-        (!storeId || offer.storeId === storeId) && (!expiringOnly || isExpiringSoon(offer, now)),
-    );
-    if (sort === "price") return [...filtered].sort((a, b) => a.priceCents - b.priceCents);
-    if (sort === "validity") {
-      const endOf = (offer: PriceOffer) =>
-        offer.validTo ? new Date(offer.validTo).getTime() : Number.POSITIVE_INFINITY;
-      return [...filtered].sort((a, b) => endOf(a) - endOf(b));
-    }
-    if (sort === "recent") return [...filtered].sort((a, b) => a.ageDays - b.ageDays);
-    return filtered; // "em destaque": com busca, a ordem de relevância; sem busca, a da API
-  }, [matchesQuery, storeId, expiringOnly, sort]);
-
+  const selectedStore = filters.storeId
+    ? (stores.find((store) => store.id === filters.storeId) ?? null)
+    : null;
   const hasFilters =
-    query.trim() !== "" || storeId !== null || expiringOnly || sort !== "relevance";
+    filters.q !== "" || filters.storeId !== null || filters.expiring || filters.sort !== "featured";
+
   function clearAll() {
     setQuery("");
-    setStoreId(null);
-    setExpiringOnly(false);
-    setSort("relevance");
+    lastPushedQuery.current = "";
+    startTransition(() => router.replace(pathname, { scroll: false }));
   }
+
+  const hrefFor = (target: number) =>
+    `${pathname}${withParams(searchParams, { [PAGE_PARAM]: target === 1 ? null : target })}`;
 
   return (
     <div className="space-y-4">
@@ -134,8 +113,10 @@ export function OffersExplorer({ offers }: { offers: readonly PriceOffer[] }) {
           </label>
           <Select
             id="ordem"
-            value={sort}
-            onChange={(event) => setSort(event.target.value as SortKey)}
+            value={filters.sort}
+            onChange={(event) =>
+              navigate({ ordem: event.target.value === "featured" ? null : event.target.value })
+            }
             className="h-12 rounded-full pl-5"
           >
             {SORT_OPTIONS.map((option) => (
@@ -148,29 +129,31 @@ export function OffersExplorer({ offers }: { offers: readonly PriceOffer[] }) {
       </div>
 
       <ChipRow aria-label="Filtros">
-        <Chip selected={storeId === null} onClick={() => setStoreId(null)}>
-          Todos os mercados
-        </Chip>
-        {stores.map((store) => (
-          <Chip
-            key={store.id}
-            selected={storeId === store.id}
-            count={store.count}
-            onClick={() => setStoreId(storeId === store.id ? null : store.id)}
-          >
-            {store.name}
-          </Chip>
-        ))}
-        <Chip selected={expiringOnly} onClick={() => setExpiringOnly(!expiringOnly)}>
+        <button
+          type="button"
+          aria-haspopup="dialog"
+          onClick={() => setIsPickerOpen(true)}
+          className={cn(chipClass(filters.storeId !== null), "max-w-full")}
+        >
+          <Store aria-hidden className="size-4 shrink-0" />
+          <span className="truncate">
+            {filters.storeId !== null ? (selectedStore?.name ?? "Mercado escolhido") : "Mercado"}
+          </span>
+          <ChevronDown aria-hidden className="size-4 shrink-0" />
+        </button>
+        <Chip
+          selected={filters.expiring}
+          onClick={() => navigate({ vence: filters.expiring ? null : "1" })}
+        >
           Vence em breve
         </Chip>
       </ChipRow>
 
       <p aria-live="polite" className="type-caption px-1">
-        {visible.length === 0
+        {total === 0
           ? "Nenhuma oferta"
-          : `${visible.length} ${visible.length === 1 ? "oferta" : "ofertas"}`}
-        {hasFilters && visible.length > 0 ? (
+          : `${numberFormatter.format(total)} ${total === 1 ? "oferta" : "ofertas"}`}
+        {hasFilters && total > 0 ? (
           <>
             {" · "}
             <button type="button" onClick={clearAll} className="font-medium text-brand">
@@ -180,7 +163,7 @@ export function OffersExplorer({ offers }: { offers: readonly PriceOffer[] }) {
         ) : null}
       </p>
 
-      {visible.length === 0 ? (
+      {offers.length === 0 ? (
         <EmptyState
           icon={<SearchX aria-hidden className="size-8" />}
           title="Nenhuma oferta com esses filtros"
@@ -188,12 +171,34 @@ export function OffersExplorer({ offers }: { offers: readonly PriceOffer[] }) {
           action={<Button onClick={clearAll}>Limpar filtros</Button>}
         />
       ) : (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          {visible.map((offer) => (
+        <div
+          aria-busy={isPending}
+          className={cn(
+            "grid grid-cols-1 gap-3 transition-opacity duration-200 md:grid-cols-2",
+            isPending && "opacity-60",
+          )}
+        >
+          {offers.map((offer) => (
             <OfferCard key={`${offer.storeId}-${offer.productId}`} offer={offer} />
           ))}
         </div>
       )}
+
+      <Pagination
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        hrefFor={hrefFor}
+        className="pt-2"
+      />
+
+      <StorePicker
+        open={isPickerOpen}
+        onOpenChange={setIsPickerOpen}
+        stores={stores}
+        selectedId={filters.storeId}
+        onSelect={(storeId) => navigate({ loja: storeId })}
+      />
     </div>
   );
 }

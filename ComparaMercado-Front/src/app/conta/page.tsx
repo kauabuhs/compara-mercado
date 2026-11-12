@@ -1,5 +1,13 @@
 import type { UserRole } from "@contracts";
-import { Camera, FileDown, LayoutDashboard, MapPin, ShieldCheck, UserX } from "lucide-react";
+import {
+  Camera,
+  FileDown,
+  LayoutDashboard,
+  ListChecks,
+  MapPin,
+  ShieldCheck,
+  UserX,
+} from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ConfirmSubmitButton } from "@/components/shared/confirm-submit";
@@ -13,6 +21,7 @@ import {
   PageHeader,
   ProductAvatar,
 } from "@/components/ui/primitives";
+import { InfoRow } from "@/modules/account/components/info-row";
 import { InstallAppRow } from "@/modules/account/components/install-app-row";
 import { SavedListRows } from "@/modules/account/components/saved-list-rows";
 import { ThemeSelector } from "@/modules/account/components/theme-selector";
@@ -28,8 +37,6 @@ const ROLE_LABEL: Record<UserRole, string> = {
   contributor: "Colaborador",
   admin: "Administrador",
 };
-
-const infoRowClass = "flex min-h-14 items-center gap-3 px-4 py-3";
 
 export default async function AccountPage() {
   const user = await getSessionUser();
@@ -76,11 +83,22 @@ export default async function AccountPage() {
                     icon={<IconTile icon={Camera} tone="warning" />}
                     title="Contribuir com preços"
                     description="Fotografe etiquetas e ajude a cidade a economizar"
-                    trailing={<Badge>em breve</Badge>}
                     chevron
                   />
                 </Link>
               </GroupRow>
+              {user ? (
+                <GroupRow>
+                  <Link href="/conta/envios" className={rowClass}>
+                    <RowContent
+                      icon={<IconTile icon={ListChecks} tone="brand" />}
+                      title="Meus envios"
+                      description="Acompanhe a análise dos preços que você enviou"
+                      chevron
+                    />
+                  </Link>
+                </GroupRow>
+              ) : null}
               {user?.role === "admin" ? (
                 <GroupRow>
                   <Link href="/admin" className={rowClass}>
@@ -113,38 +131,114 @@ export default async function AccountPage() {
             }
           >
             <Group>
-              <GroupRow className={infoRowClass}>
-                <RowContent
-                  icon={<IconTile icon={MapPin} tone="brand" />}
-                  title="Sua localização"
-                  description="Usada só para calcular distâncias, no seu aparelho. Nada é guardado."
-                />
-              </GroupRow>
-              <GroupRow className={infoRowClass}>
-                <RowContent
-                  icon={<IconTile icon={ShieldCheck} tone="neutral" />}
-                  title="Dados que guardamos"
-                  description={
-                    user ? "Apenas o seu e-mail, para o acesso." : "Nenhum: você não está logado."
-                  }
-                />
-              </GroupRow>
+              <InfoRow
+                icon={<IconTile icon={MapPin} tone="brand" />}
+                title="Sua localização"
+                summary="Só para calcular distâncias. Nada é guardado."
+              >
+                <p>
+                  Usamos a sua posição para mostrar a distância até cada mercado e para ordenar do
+                  mais perto ao mais longe. Ela só é pedida quando você toca em{" "}
+                  <strong>Ordenar por distância</strong> ou usa a localização na comparação da
+                  lista.
+                </p>
+                <ul className="list-disc space-y-2 pl-5">
+                  <li>
+                    <strong>No mapa:</strong> a distância é calculada no seu aparelho. A posição não
+                    sai dele.
+                  </li>
+                  <li>
+                    <strong>Na comparação da lista:</strong> a posição vai junto da consulta para
+                    calcular a distância dos mercados, é descartada logo em seguida e nunca é
+                    gravada.
+                  </li>
+                  <li>Não há histórico de onde você esteve.</li>
+                </ul>
+                <p className="text-muted-foreground">
+                  Você pode recusar ou desligar a permissão nas configurações do navegador, e tudo
+                  continua funcionando sem ela, só sem as distâncias.
+                </p>
+              </InfoRow>
+
+              <InfoRow
+                icon={<IconTile icon={ShieldCheck} tone="neutral" />}
+                title="Dados que guardamos"
+                summary={
+                  user ? "Apenas o seu e-mail, para o acesso." : "Nenhum: você não está logado."
+                }
+              >
+                {user ? (
+                  <>
+                    <p>
+                      Guardamos apenas o seu <strong>e-mail</strong>, usado para o acesso sem senha:
+                      mandamos um link e é ele que abre a sua sessão.
+                    </p>
+                    <ul className="list-disc space-y-2 pl-5">
+                      <li>
+                        Sua <strong>lista de compras</strong> fica só neste aparelho, não vai para
+                        os nossos servidores.
+                      </li>
+                      <li>
+                        Sua <strong>localização</strong> nunca é gravada.
+                      </li>
+                      <li>
+                        Os preços que você enviar ficam associados à sua conta para evitar abuso,
+                        mas nunca aparecem para outras pessoas.
+                      </li>
+                    </ul>
+                  </>
+                ) : (
+                  <>
+                    <p>
+                      Você não está logado, então não guardamos <strong>nenhum dado seu</strong>.
+                      Consultar preços e montar listas não exige conta.
+                    </p>
+                    <ul className="list-disc space-y-2 pl-5">
+                      <li>
+                        Sua <strong>lista de compras</strong> fica só neste aparelho.
+                      </li>
+                      <li>
+                        Sua <strong>localização</strong> nunca é gravada.
+                      </li>
+                    </ul>
+                    <p className="text-muted-foreground">
+                      Se um dia você entrar para contribuir, guardaremos apenas o seu e-mail, para o
+                      acesso.
+                    </p>
+                  </>
+                )}
+              </InfoRow>
+
               {user ? (
                 <>
-                  <GroupRow className={`${infoRowClass} opacity-60`}>
-                    <RowContent
-                      icon={<IconTile icon={FileDown} tone="neutral" />}
-                      title="Exportar meus dados"
-                      trailing={<Badge>em breve</Badge>}
-                    />
-                  </GroupRow>
-                  <GroupRow className={`${infoRowClass} opacity-60`}>
-                    <RowContent
-                      icon={<IconTile icon={UserX} tone="neutral" />}
-                      title="Excluir minha conta"
-                      trailing={<Badge>em breve</Badge>}
-                    />
-                  </GroupRow>
+                  <InfoRow
+                    icon={<IconTile icon={FileDown} tone="neutral" />}
+                    title="Exportar meus dados"
+                    trailing={<Badge>em breve</Badge>}
+                  >
+                    <p>
+                      Você poderá baixar uma cópia de tudo o que guardamos sobre você (hoje, o seu
+                      e-mail e as contribuições que enviou).
+                    </p>
+                    <p className="text-muted-foreground">
+                      Esse recurso chega antes do beta fechado. Até lá, escreva para o contato da
+                      política de privacidade e enviamos a cópia.
+                    </p>
+                  </InfoRow>
+                  <InfoRow
+                    icon={<IconTile icon={UserX} tone="neutral" />}
+                    title="Excluir minha conta"
+                    trailing={<Badge>em breve</Badge>}
+                  >
+                    <p>
+                      Você poderá apagar a sua conta e os dados ligados a ela, sem precisar pedir a
+                      ninguém.
+                    </p>
+                    <p className="text-muted-foreground">
+                      Esse recurso chega antes do beta fechado. Até lá, escreva para o contato da
+                      política de privacidade e fazemos a exclusão por você.
+                    </p>
+                  </InfoRow>
                 </>
               ) : null}
             </Group>

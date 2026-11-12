@@ -8,6 +8,41 @@ const shortDateFormatter = new Intl.DateTimeFormat("pt-BR", {
   timeZone: "America/Sao_Paulo",
 });
 
+// Datas do gráfico chegam como ms UTC à meia-noite (o dia já foi decidido em Brasília): formatar em UTC.
+const dayMonthFormatter = new Intl.DateTimeFormat("pt-BR", {
+  day: "numeric",
+  month: "short",
+  timeZone: "UTC",
+});
+const longDayFormatter = new Intl.DateTimeFormat("pt-BR", {
+  day: "numeric",
+  month: "long",
+  timeZone: "UTC",
+});
+const axisPriceFormatter = new Intl.NumberFormat("pt-BR", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+/** "12 ago" (sem ponto e sem "de"): cabe no eixo de um gráfico pequeno. */
+export function formatDayMonth(utcMidnightMs: number): string {
+  return dayMonthFormatter
+    .formatToParts(utcMidnightMs)
+    .filter((part) => part.type === "day" || part.type === "month")
+    .map((part) => part.value.replace(".", ""))
+    .join(" ");
+}
+
+/** "12 de agosto". */
+export function formatLongDay(utcMidnightMs: number): string {
+  return longDayFormatter.format(utcMidnightMs);
+}
+
+/** 599 -> "5,99": número do eixo, sem o símbolo da moeda. */
+export function formatAxisPrice(cents: number): string {
+  return axisPriceFormatter.format(cents / 100);
+}
+
 /** 599 -> "R$ 5,99". Dinheiro trafega sempre em centavos inteiros. */
 export function formatBRL(cents: number): string {
   return brlFormatter.format(cents / 100);

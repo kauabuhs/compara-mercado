@@ -6,8 +6,10 @@ import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Chip, SearchField } from "@/components/ui/controls";
+import { Pagination } from "@/components/ui/pagination";
 import { EmptyState, Group, GroupRow, IconTile } from "@/components/ui/primitives";
 import { formatDistance } from "@/lib/format";
+import { clampPage, LIST_PAGE_SIZE, totalPages } from "@/lib/pagination";
 import { searchItems } from "@/lib/search";
 import { cn } from "@/lib/utils";
 import type { MapStore } from "./store-map";
@@ -58,7 +60,9 @@ export function StoresView({ stores }: { stores: StoreRow[] }) {
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
   const mapWrapperRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   // Busca instantânea (sem acento, tolera erro de digitação) e, com a posição, do mais perto ao mais longe.
   const visibleStores = useMemo(() => {
@@ -78,18 +82,37 @@ export function StoresView({ stores }: { stores: StoreRow[] }) {
 
   const selectedStore = visibleStores.find((store) => store.id === selectedId) ?? null;
 
+  // O mapa mostra todos os mercados; só a lista abaixo é paginada.
+  const pages = totalPages(visibleStores.length, LIST_PAGE_SIZE);
+  const currentPage = clampPage(page, pages);
+  const pageStores = visibleStores.slice(
+    (currentPage - 1) * LIST_PAGE_SIZE,
+    currentPage * LIST_PAGE_SIZE,
+  );
+
   function selectStore(storeId: string | null) {
     setSelectedId(storeId);
+    if (!storeId) return;
+    // Um pino do mapa pode ser de outra página da lista: leva a lista até ele.
+    const index = visibleStores.findIndex((store) => store.id === storeId);
+    if (index >= 0) setPage(Math.floor(index / LIST_PAGE_SIZE) + 1);
     // No celular a lista fica abaixo do mapa: traz o mapa para a tela ao escolher um mercado.
-    if (storeId) mapWrapperRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    mapWrapperRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
+
+  function changePage(target: number) {
+    setPage(target);
+    listRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
   }
 
   function requestUserLocation() {
     setGeoError(null);
     if (!("geolocation" in navigator)) return setGeoError("Seu aparelho não oferece localização.");
     navigator.geolocation.getCurrentPosition(
-      (position) =>
-        setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude }),
+      (position) => {
+        setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
+        setPage(1); // a ordem muda para "do mais perto ao mais longe": começa pelo primeiro
+      },
       () => setGeoError("Não conseguimos sua localização. Você pode continuar sem ela."),
       { maximumAge: 300_000, timeout: 8000 },
     );
@@ -151,7 +174,10 @@ export function StoresView({ stores }: { stores: StoreRow[] }) {
           label="Buscar mercado"
           placeholder="Buscar mercado ou bairro"
           value={query}
-          onValueChange={setQuery}
+          onValueChange={(value) => {
+            setQuery(value);
+            setPage(1);
+          }}
           maxLength={80}
           className="flex-1"
         />
@@ -170,46 +196,64 @@ export function StoresView({ stores }: { stores: StoreRow[] }) {
         </p>
       ) : null}
 
-      {visibleStores.length === 0 ? (
-        <EmptyState
-          icon={<SearchX aria-hidden className="size-8" />}
-          title="Nenhum mercado encontrado"
-          description="Tente outro nome ou bairro."
-          action={<Button onClick={() => setQuery("")}>Limpar busca</Button>}
+      <div ref={listRef} className="scroll-mt-4 space-y-4">
+        {visibleStores.length === 0 ? (
+          <EmptyState
+            icon={<SearchX aria-hidden className="size-8" />}
+            title="Nenhum mercado encontrado"
+            description="Tente outro nome ou bairro."
+            action={
+              <Button
+                onClick={() => {
+                  setQuery("");
+                  setPage(1);
+                }}
+              >
+                Limpar busca
+              </Button>
+            }
+          />
+        ) : (
+          <Group>
+            {pageStores.map((store) => {
+              const isSelected = store.id === selectedId;
+              return (
+                <GroupRow key={store.id}>
+                  <button
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => selectStore(isSelected ? null : store.id)}
+                    className={cn(
+                      "flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-muted active:bg-fill",
+                      isSelected && "bg-brand-soft hover:bg-brand-soft",
+                    )}
+                  >
+                    <IconTile icon={Store} tone={isSelected ? "brand" : "info"} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">{store.name}</p>
+                      <p className="type-caption truncate">
+                        {[store.neighborhood, store.address].filter(Boolean).join(" · ")}
+                      </p>
+                    </div>
+                    {store.meters !== null ? (
+                      <span className="shrink-0 font-semibold tabular-nums">
+                        {formatDistance(store.meters)}
+                      </span>
+                    ) : null}
+                  </button>
+                </GroupRow>
+              );
+            })}
+          </Group>
+        )}
+
+        <Pagination
+          page={currentPage}
+          pageSize={LIST_PAGE_SIZE}
+          total={visibleStores.length}
+          onPageChange={changePage}
         />
-      ) : (
-        <Group>
-          {visibleStores.map((store) => {
-            const isSelected = store.id === selectedId;
-            return (
-              <GroupRow key={store.id}>
-                <button
-                  type="button"
-                  aria-pressed={isSelected}
-                  onClick={() => selectStore(isSelected ? null : store.id)}
-                  className={cn(
-                    "flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-muted active:bg-fill",
-                    isSelected && "bg-brand-soft hover:bg-brand-soft",
-                  )}
-                >
-                  <IconTile icon={Store} tone={isSelected ? "brand" : "info"} />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{store.name}</p>
-                    <p className="type-caption truncate">
-                      {[store.neighborhood, store.address].filter(Boolean).join(" · ")}
-                    </p>
-                  </div>
-                  {store.meters !== null ? (
-                    <span className="shrink-0 font-semibold tabular-nums">
-                      {formatDistance(store.meters)}
-                    </span>
-                  ) : null}
-                </button>
-              </GroupRow>
-            );
-          })}
-        </Group>
-      )}
+      </div>
     </div>
   );
 }

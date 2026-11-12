@@ -355,6 +355,23 @@
     width: min(calc(100% - 1rem), 26rem);
     margin: auto auto max(0.5rem, env(safe-area-inset-bottom)) auto;
   }
+
+  /* Estilo 3 — Sheet de detalhes: painel largo ancorado na borda de baixo; sobe da base da tela
+     (translateY 100% → 0) e desce ao fechar. O painel (vidro) é filho do <dialog>, que é
+     transparente: o clique "fora" continua sendo o clique no fundo. */
+  .dialog-detail {
+    --dialog-from: translateY(100%);
+    --dialog-to: translateY(100%);
+    width: min(100%, 40rem);
+    margin: auto auto 0 auto;
+    overflow: visible;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dialog-detail {
+      --dialog-from: none;
+      --dialog-to: none;
+    }
+  }
 }
 
 @layer base {

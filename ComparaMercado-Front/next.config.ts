@@ -38,6 +38,9 @@ const config: NextConfig = {
   poweredByHeader: false,
   // Remove o botão "N" do Next em desenvolvimento (config oficial; erros continuam no overlay).
   devIndicators: false,
+  // Server Actions aceitam 1 MB por padrão. O envio de preço leva uma foto (o navegador a comprime
+  // para ~1,5 MB; a API recusa acima de 5 MB), então o teto sobe só o necessário.
+  experimental: { serverActions: { bodySizeLimit: "6mb" } },
   // O contrato Ã© a Ãºnica fonte fora do diretÃ³rio do front. Limitar a raiz ao monorepo
   // permite que Turbopack acompanhe esse arquivo sem abrir a observaÃ§Ã£o para fora do projeto.
   turbopack: { root: join(import.meta.dirname, "..") },

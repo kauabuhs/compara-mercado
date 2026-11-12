@@ -13,27 +13,72 @@
   }
 }
 
-/* Créditos exigidos pela licença dos dados, no mesmo vidro do resto da interface. */
+/* Créditos exigidos pela licença dos dados: botão "ⓘ" redondo, no mesmo vidro do resto da interface.
+   O MapLibre dá ao contêiner `padding: 2px 24px 2px 0` e ao botão 24 px com fundo próprio; ao
+   aumentar só o botão ele vazava do contêiner (uma bolha cinza cortada). Aqui o contêiner FECHADO
+   tem exatamente o tamanho do botão e quem desenha o círculo é ele; ABERTO, vira uma cápsula com
+   o texto e o botão continua fixo no canto, sem mudar de tamanho. */
+.map-canvas {
+  --attrib-size: 2rem;
+}
+@media (pointer: coarse) {
+  .map-canvas {
+    --attrib-size: 2.75rem; /* alvo de toque de 44 px */
+  }
+}
 .map-canvas .maplibregl-ctrl-attrib.maplibregl-compact {
+  box-sizing: border-box;
   margin: 0.75rem;
-  border-radius: 9999px;
+  min-height: var(--attrib-size);
+  border-radius: calc(var(--attrib-size) / 2);
   background-color: var(--glass-strong);
   color: var(--foreground);
   box-shadow: var(--glass-edge);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
+  font-size: 0.75rem;
+  line-height: 1.25;
+}
+.map-canvas .maplibregl-ctrl-attrib.maplibregl-compact:not(.maplibregl-compact-show) {
+  width: var(--attrib-size);
+  height: var(--attrib-size);
+  padding: 0;
+}
+.map-canvas .maplibregl-ctrl-attrib.maplibregl-compact.maplibregl-compact-show {
+  display: flex;
+  align-items: center;
+  /* a esquerda reserva o espaço do botão (ele é absoluto, no canto) */
+  padding: 0.35rem 0.85rem 0.35rem calc(var(--attrib-size) + 0.25rem);
 }
 .map-canvas .maplibregl-ctrl-attrib a {
   color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
-.map-canvas .maplibregl-ctrl-attrib-button {
-  width: 2rem;
-  height: 2rem;
+.map-canvas .maplibregl-ctrl-attrib-button,
+.map-canvas .maplibregl-ctrl-attrib.maplibregl-compact-show .maplibregl-ctrl-attrib-button {
+  top: 0;
+  left: 0;
+  width: var(--attrib-size);
+  height: var(--attrib-size);
+  border-radius: 9999px;
+  background-color: transparent;
+  background-position: center;
+  background-size: 1.375rem;
 }
-@media (pointer: coarse) {
-  .map-canvas .maplibregl-ctrl-attrib-button {
-    width: 2.75rem;
-    height: 2.75rem;
+.map-canvas .maplibregl-ctrl-attrib-button:hover {
+  background-color: var(--fill);
+}
+.map-canvas .maplibregl-ctrl-attrib-button:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring);
+}
+/* O ícone do MapLibre é um SVG preto: no tema escuro, é invertido para continuar visível. */
+:root[data-theme="dark"] .map-canvas .maplibregl-ctrl-attrib-button {
+  filter: invert(1);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .map-canvas .maplibregl-ctrl-attrib-button {
+    filter: invert(1);
   }
 }
 

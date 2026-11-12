@@ -9,6 +9,14 @@ import type {
 } from "react";
 import { cn } from "@/lib/utils";
 
+/** Classes da pílula de filtro (para botões que não são um simples liga/desliga, como abrir um sheet). */
+export function chipClass(selected: boolean): string {
+  return cn(
+    "inline-flex h-11 shrink-0 items-center gap-2 rounded-full px-4 text-sm font-medium whitespace-nowrap transition-[background-color,color,transform] duration-200 active:scale-[0.97]",
+    selected ? "bg-brand text-brand-foreground" : "glass text-foreground hover:bg-glass-strong",
+  );
+}
+
 /** Filtro em forma de pílula: vidro quando desligado, verde quando ligado. Alvo de 44 px. */
 export function Chip({
   selected,
@@ -24,11 +32,7 @@ export function Chip({
     <button
       type="button"
       aria-pressed={selected}
-      className={cn(
-        "inline-flex h-11 shrink-0 items-center gap-2 rounded-full px-4 text-sm font-medium whitespace-nowrap transition-[background-color,color,transform] duration-200 active:scale-[0.97]",
-        selected ? "bg-brand text-brand-foreground" : "glass text-foreground hover:bg-glass-strong",
-        className,
-      )}
+      className={cn(chipClass(selected), className)}
       {...props}
     >
       {children}

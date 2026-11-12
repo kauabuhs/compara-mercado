@@ -23,7 +23,7 @@ export async function suggestProductsAction(term: unknown): Promise<ProductSugge
   const cleanTerm = term.trim().slice(0, MAX_TERM_LENGTH);
   if (cleanTerm.length < MIN_TERM_LENGTH) return [];
   try {
-    const hits = await searchProducts(cleanTerm, MAX_SUGGESTIONS);
+    const { hits } = await searchProducts(cleanTerm, { pageSize: MAX_SUGGESTIONS });
     return hits.map((hit) => ({
       productId: hit.productId,
       name: hit.name,

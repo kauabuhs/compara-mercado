@@ -1,92 +1,68 @@
-"use client";
-
 import type { ProductHit } from "@contracts";
 import { SearchX } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Chip, ChipRow } from "@/components/ui/controls";
+import { chipClass } from "@/components/ui/controls";
+import { Pagination } from "@/components/ui/pagination";
 import { Badge, EmptyState, Group, GroupRow, ProductAvatar } from "@/components/ui/primitives";
 import { formatBRLUnit, formatSize } from "@/lib/format";
-import { normalizeText } from "@/lib/search";
 
-const MAX_BRAND_CHIPS = 6;
-const MIN_HITS_FOR_FILTERS = 5; // poucos resultados: filtros só atrapalham
+interface SearchResultsProps {
+  /** A página atual de resultados (a API já filtrou e paginou). */
+  hits: readonly ProductHit[];
+  term: string;
+  total: number;
+  page: number;
+  pageSize: number;
+  onlyPriced: boolean;
+  /** Link da página `n` mantendo a busca e o filtro. */
+  pageHref: (page: number) => string;
+  /** Link que liga/desliga o filtro "Com preço" (volta à página 1). */
+  toggleOnlyPricedHref: string;
+}
 
-/** Resultados da busca com filtros que só aparecem quando ajudam: "com preço" e marcas. */
-export function SearchResults({ hits, term }: { hits: readonly ProductHit[]; term: string }) {
-  const [onlyPriced, setOnlyPriced] = useState(false);
-  const [brand, setBrand] = useState<string | null>(null);
-
-  const brands = useMemo(() => {
-    const counts = new Map<string, { label: string; count: number }>();
-    for (const hit of hits) {
-      if (!hit.brand) continue;
-      const key = normalizeText(hit.brand);
-      const entry = counts.get(key) ?? { label: hit.brand, count: 0 };
-      entry.count += 1;
-      counts.set(key, entry);
-    }
-    return [...counts.entries()]
-      .map(([key, { label, count }]) => ({ key, label, count }))
-      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "pt-BR"))
-      .slice(0, MAX_BRAND_CHIPS);
-  }, [hits]);
-
-  const visible = hits.filter(
-    (hit) =>
-      (!onlyPriced || hit.minUnitPriceCents !== null) &&
-      (!brand || (hit.brand && normalizeText(hit.brand) === brand)),
-  );
-  const showFilters = hits.length >= MIN_HITS_FOR_FILTERS;
-  const pricedCount = hits.filter((hit) => hit.minUnitPriceCents !== null).length;
-
+/** Resultados da busca: filtro "Com preço" e paginação, ambos na URL (decididos no servidor). */
+export function SearchResults({
+  hits,
+  term,
+  total,
+  page,
+  pageSize,
+  onlyPriced,
+  pageHref,
+  toggleOnlyPricedHref,
+}: SearchResultsProps) {
   return (
     <div className="space-y-4">
-      {showFilters ? (
-        <ChipRow aria-label="Filtros">
-          {pricedCount < hits.length ? (
-            <Chip
-              selected={onlyPriced}
-              count={pricedCount}
-              onClick={() => setOnlyPriced(!onlyPriced)}
-            >
-              Com preço
-            </Chip>
-          ) : null}
-          {brands.length > 1
-            ? brands.map((entry) => (
-                <Chip
-                  key={entry.key}
-                  selected={brand === entry.key}
-                  count={entry.count}
-                  onClick={() => setBrand(brand === entry.key ? null : entry.key)}
-                >
-                  {entry.label}
-                </Chip>
-              ))
-            : null}
-        </ChipRow>
-      ) : null}
+      <div className="flex items-center gap-3">
+        <Link
+          href={toggleOnlyPricedHref}
+          scroll={false}
+          aria-current={onlyPriced ? "true" : undefined}
+          className={chipClass(onlyPriced)}
+        >
+          Com preço
+          {onlyPriced ? <span className="sr-only"> (filtro ativo)</span> : null}
+        </Link>
+        <p aria-live="polite" className="type-caption">
+          {new Intl.NumberFormat("pt-BR").format(total)} {total === 1 ? "resultado" : "resultados"}
+        </p>
+      </div>
 
-      {visible.length === 0 ? (
+      {hits.length === 0 ? (
         <EmptyState
           icon={<SearchX aria-hidden className="size-8" />}
-          title="Nenhum resultado com esses filtros"
+          title="Nenhum resultado com preço"
+          description="Há produtos com esse nome, mas nenhum mercado tem preço vigente para eles."
           action={
-            <Button
-              onClick={() => {
-                setOnlyPriced(false);
-                setBrand(null);
-              }}
-            >
-              Limpar filtros
+            <Button asChild>
+              <Link href={toggleOnlyPricedHref}>Mostrar todos</Link>
             </Button>
           }
         />
       ) : (
         <Group aria-label={`Resultados para ${term}`}>
-          {visible.map((hit) => (
+          {hits.map((hit) => (
             <GroupRow key={hit.productId}>
               <Link
                 href={`/produto/${hit.productId}`}
@@ -120,6 +96,14 @@ export function SearchResults({ hits, term }: { hits: readonly ProductHit[]; ter
           ))}
         </Group>
       )}
+
+      <Pagination
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        hrefFor={pageHref}
+        className="pt-2"
+      />
     </div>
   );
 }

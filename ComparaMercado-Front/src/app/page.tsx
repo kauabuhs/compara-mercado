@@ -10,7 +10,7 @@ import { listOffers, listStores } from "@/services/api/endpoints";
 
 export default async function HomePage() {
   await connection();
-  const [offers, stores] = await Promise.all([listOffers({ limit: 6 }), listStores()]);
+  const [{ offers }, stores] = await Promise.all([listOffers({ pageSize: 6 }), listStores()]);
 
   return (
     <div className="space-y-12">

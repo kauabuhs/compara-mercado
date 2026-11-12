@@ -1,7 +1,8 @@
 "use client";
 
-import { type ReactNode, useEffect, useId, useRef } from "react";
+import { type ReactNode, useId } from "react";
 import { cn } from "@/lib/utils";
+import { useModalDialog } from "./use-modal-dialog";
 
 export type DialogStyle = "alert" | "sheet";
 
@@ -35,16 +36,9 @@ export function ConfirmDialog({
   destructive = false,
   onConfirm,
 }: ConfirmDialogProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const { dialogProps } = useModalDialog(open, onOpenChange);
   const titleId = useId();
   const descriptionId = useId();
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
-  }, [open]);
 
   const close = () => onOpenChange(false);
   const confirm = () => {
@@ -55,16 +49,10 @@ export function ConfirmDialog({
   const confirmTone = destructive ? "text-danger" : "text-brand";
 
   return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: o equivalente por teclado é a tecla Esc do <dialog> nativo
     <dialog
-      ref={dialogRef}
+      {...dialogProps}
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}
-      onClose={close}
-      // Clique no fundo (fora dos painéis) cancela, como no iOS. O teclado já cancela com Esc (nativo).
-      onClick={(event) => {
-        if (event.target === event.currentTarget) close();
-      }}
       className={cn("dialog", variant === "alert" ? "dialog-alert" : "dialog-sheet")}
     >
       {variant === "alert" ? (

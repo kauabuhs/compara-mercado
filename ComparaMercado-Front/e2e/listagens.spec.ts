@@ -7,52 +7,57 @@ test.use({
   },
 });
 
-test.describe("ofertas: busca e filtros", () => {
-  test("busca instantânea ignora acento, tolera erro de digitação e vai para a URL", async ({
-    page,
-  }) => {
+// A busca, o filtro e a página das ofertas são decididos no SERVIDOR (a cidade pode ter milhares);
+// o estado vive na URL, e a URL só muda quando o servidor responde.
+test.describe("ofertas: busca, filtros e paginação", () => {
+  test("busca ignora acento, vai para a URL e o estado vazio tem saída", async ({ page }) => {
     await page.goto("/ofertas");
     const cards = page.locator("main a[href^='/produto/']");
-    const total = await cards.count();
-    expect(total).toBeGreaterThan(3);
+    const initialCards = await cards.count();
+    expect(initialCards).toBeGreaterThan(3);
 
     const search = page.getByRole("searchbox", { name: "Buscar nas ofertas" });
     await search.fill("sabão");
-    await expect(cards.first()).toContainText("Sabão em pó");
+    await expect(page).toHaveURL(/[?&]q=sab(%C3%A3|ã)o/);
     const matches = await cards.count();
     expect(matches).toBeGreaterThanOrEqual(1);
-    expect(matches).toBeLessThan(total);
+    expect(matches).toBeLessThan(initialCards);
     await expect(cards.filter({ hasText: "Sabão em pó" })).toHaveCount(matches);
-    await expect(page).toHaveURL(/[?&]q=sab(%C3%A3|ã)o/);
 
-    // sem acento e com letras trocadas de lugar: mesmo resultado
+    // sem acento: mesmo resultado
     await search.fill("sabao");
-    await expect(cards).toHaveCount(matches);
-    await search.fill("sbaão");
+    await expect(page).toHaveURL(/[?&]q=sabao/);
     await expect(cards).toHaveCount(matches);
 
     // nada encontrado: estado vazio com saída; limpar traz tudo de volta
     await search.fill("pneu");
     await expect(page.getByText("Nenhuma oferta com esses filtros")).toBeVisible();
     await page.getByRole("button", { name: "Limpar filtros" }).click();
-    await expect(cards).toHaveCount(total);
+    await expect(cards).toHaveCount(initialCards);
     await expect(search).toHaveValue("");
   });
 
-  test("filtro por mercado, ordenação por preço e link compartilhável", async ({ page }) => {
+  test("filtro por mercado (sheet com busca), ordenação por preço e link compartilhável", async ({
+    page,
+  }) => {
     await page.goto("/ofertas");
     const cards = page.locator("main a[href^='/produto/']");
-    const total = await cards.count();
+    const initialCards = await cards.count();
 
-    const storeChips = page.getByRole("group", { name: "Filtros" }).getByRole("button");
-    // [0] = "Todos os mercados", depois um chip por mercado e "Vence em breve"
-    await storeChips.nth(1).click();
+    await page.getByRole("button", { name: "Mercado", exact: true }).click();
+    const sheet = page.getByRole("dialog", { name: "Escolher mercado" });
+    await expect(sheet).toBeVisible();
+    await sheet.getByRole("searchbox", { name: "Buscar mercado" }).fill("centro");
+    await sheet.getByRole("button", { name: /Mercado Centro/ }).click();
+    await expect(page).toHaveURL(/[?&]loja=/);
+    await expect(sheet).toBeHidden();
     const filtered = await cards.count();
     expect(filtered).toBeGreaterThan(0);
-    expect(filtered).toBeLessThan(total);
-    await expect(page).toHaveURL(/[?&]loja=/);
+    expect(filtered).toBeLessThan(initialCards);
+    await expect(cards.filter({ hasText: "Mercado Centro" })).toHaveCount(filtered);
 
     await page.getByLabel("Ordenar por").selectOption("price");
+    await expect(page).toHaveURL(/[?&]ordem=price/);
     const prices = await cards.evaluateAll((links) =>
       links.map((link) => {
         const text = link.textContent ?? "";
@@ -67,6 +72,22 @@ test.describe("ofertas: busca e filtros", () => {
     await page.goto(url);
     await expect(page.getByLabel("Ordenar por")).toHaveValue("price");
     await expect(cards).toHaveCount(filtered);
+  });
+
+  test("paginação numerada: página 2 pela URL, voltar e página além do fim", async ({ page }) => {
+    await page.goto("/ofertas?pagina=2");
+    const pager = page.getByRole("navigation", { name: "Paginação" });
+    await expect(pager).toBeVisible();
+    await expect(pager.locator("[aria-current='page']")).toHaveText("2");
+    await expect(pager).toContainText(/Mostrando 21–\d+ de \d+/);
+
+    await pager.getByRole("link", { name: "Página anterior" }).click();
+    await expect(page).not.toHaveURL(/pagina=/);
+    await expect(pager.locator("[aria-current='page']")).toHaveText("1");
+
+    // link antigo para uma página que não existe mais leva à última que existe
+    await page.goto("/ofertas?pagina=999");
+    await expect(page).toHaveURL(/[?&]pagina=2/);
   });
 });
 
@@ -118,10 +139,10 @@ test.describe("mercados: mapa e lista sincronizados", () => {
     // "Ver ofertas" já chega filtrado pelo mercado
     await verOfertas.click();
     await expect(page).toHaveURL(/\/ofertas\?loja=/);
-    const chips = page
-      .getByRole("group", { name: "Filtros" })
-      .getByRole("button", { pressed: true });
-    await expect(chips).toContainText(/Centro/);
+    // o botão "Mercado" passa a mostrar o mercado escolhido
+    await expect(
+      page.getByRole("group", { name: "Filtros" }).getByRole("button").first(),
+    ).toContainText(/Centro/);
   });
 
   test("clicar no pino seleciona o mercado na lista", async ({ page }) => {
@@ -139,10 +160,41 @@ test.describe("conta", () => {
     await expect(page.getByRole("heading", { name: "Entre para contribuir" })).toBeVisible();
     await expect(page.getByLabel("Seu e-mail")).toBeVisible();
     await expect(page.getByRole("link", { name: /Minha lista de compras/ })).toBeVisible();
-    await expect(page.getByText("Sua localização")).toBeVisible();
+    await expect(page.getByRole("button", { name: /Sua localização/ })).toBeVisible();
     // visitante não vê ações de conta
     await expect(page.getByRole("button", { name: "Sair da conta" })).toHaveCount(0);
     await expect(page.getByText("Excluir minha conta")).toHaveCount(0);
+  });
+
+  test("detalhes de privacidade abrem num sheet com o texto completo e fecham de 3 jeitos", async ({
+    page,
+  }) => {
+    await page.goto("/conta");
+    const sheet = page.getByRole("dialog", { name: "Sua localização" });
+    const open = page.getByRole("button", { name: /Sua localização/ });
+
+    await open.click();
+    await expect(sheet).toBeVisible();
+    // o texto que na linha ficava cortado está inteiro no sheet
+    await expect(sheet).toContainText("nunca é gravada");
+    await expect(sheet).toContainText("No mapa:");
+
+    // o sheet nasce colado na borda de baixo da tela
+    const box = await sheet.boundingBox();
+    const viewport = page.viewportSize();
+    expect(box).not.toBeNull();
+    expect(Math.abs((box?.y ?? 0) + (box?.height ?? 0) - (viewport?.height ?? 0))).toBeLessThan(2);
+
+    await page.keyboard.press("Escape");
+    await expect(sheet).toBeHidden();
+
+    await open.click();
+    await sheet.getByRole("button", { name: "Fechar" }).click();
+    await expect(sheet).toBeHidden();
+
+    await open.click();
+    await page.mouse.click(5, 5); // toque no fundo
+    await expect(sheet).toBeHidden();
   });
 
   test("aparência: escolher escuro aplica e persiste", async ({ page }) => {

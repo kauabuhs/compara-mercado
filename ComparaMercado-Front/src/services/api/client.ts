@@ -30,6 +30,8 @@ export interface ApiRequestOptions<T> {
   method?: "GET" | "POST";
   query?: Record<string, string | number | undefined>;
   body?: unknown;
+  /** Corpo multipart (upload de foto). O fetch define o Content-Type, com o boundary. */
+  formData?: FormData;
   /** Token do Supabase Auth do usuário logado (repassado no cabeçalho Authorization). */
   accessToken?: string;
   /** IP do cliente final, para o limite de taxa da API. */
@@ -71,7 +73,11 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions<T>)
     response = await fetch(url, {
       method: options.method ?? "GET",
       headers,
-      ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
+      ...(options.formData
+        ? { body: options.formData }
+        : options.body !== undefined
+          ? { body: JSON.stringify(options.body) }
+          : {}),
       ...(sharedCache
         ? {
             next: {
@@ -96,4 +102,20 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions<T>)
   }
 
   return options.schema.parse(await response.json());
+}
+
+/**
+ * Busca um arquivo binário da API (ex.: foto da etiqueta, só para o admin). Devolve a resposta
+ * crua para o chamador repassar os bytes; erros de status ficam por conta dele. Nunca em cache.
+ */
+export async function apiFetchBinary(path: string, accessToken: string): Promise<Response> {
+  try {
+    return await fetch(new URL(path, env().API_URL), {
+      headers: { authorization: `Bearer ${accessToken}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (cause) {
+    throw new ApiUnavailableError({ cause });
+  }
 }

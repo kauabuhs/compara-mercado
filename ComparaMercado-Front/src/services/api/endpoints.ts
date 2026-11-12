@@ -2,9 +2,12 @@ import {
   AdminOverviewSchema,
   apiRoutes,
   type CompareListRequest,
+  ContributionCreatedSchema,
   ListComparisonSchema,
   type ManualPriceRequest,
+  MyContributionsResponseSchema,
   OffersResponseSchema,
+  type OffersSort,
   PriceFormOptionsSchema,
   ProductDetailsSchema,
   type ReviewDecision,
@@ -15,7 +18,7 @@ import {
 } from "@contracts";
 import { cache } from "react";
 import { z } from "zod";
-import { ApiRequestError, apiRequest, CATALOG_CACHE_TAG } from "./client";
+import { ApiRequestError, apiFetchBinary, apiRequest, CATALOG_CACHE_TAG } from "./client";
 
 const OkResponseSchema = z.object({ ok: z.literal(true) });
 
@@ -30,12 +33,20 @@ const catalogCache = (revalidate: number) => ({ revalidate, tags: [CATALOG_CACHE
 
 // ── Públicos ───────────────────────────────────────────────────────────────────────────────────
 
-export async function searchProducts(term: string, limit: number) {
-  const { hits } = await apiRequest(apiRoutes.searchProducts, {
+/** Uma página da busca de produtos, com o `total` de resultados para a paginação. */
+export function searchProducts(
+  term: string,
+  options: { page?: number; pageSize?: number; onlyPriced?: boolean } = {},
+) {
+  return apiRequest(apiRoutes.searchProducts, {
     schema: SearchProductsResponseSchema,
-    query: { q: term, limit },
+    query: {
+      q: term,
+      page: options.page,
+      pageSize: options.pageSize,
+      onlyPriced: options.onlyPriced ? "1" : undefined,
+    },
   });
-  return hits;
 }
 
 /**
@@ -57,13 +68,29 @@ export const getProductDetails = cache(async (productId: string) => {
   }
 });
 
-export async function listOffers(options: { limit?: number; storeId?: string } = {}) {
-  const { offers } = await apiRequest(apiRoutes.offers, {
+export interface ListOffersOptions {
+  page?: number;
+  pageSize?: number;
+  storeId?: string;
+  q?: string;
+  sort?: OffersSort;
+  expiringSoon?: boolean;
+}
+
+/** Uma página de ofertas; busca, filtro e ordenação são feitos no servidor (a API pagina). */
+export function listOffers(options: ListOffersOptions = {}) {
+  return apiRequest(apiRoutes.offers, {
     schema: OffersResponseSchema,
-    query: { limit: options.limit, storeId: options.storeId },
+    query: {
+      page: options.page,
+      pageSize: options.pageSize,
+      storeId: options.storeId,
+      q: options.q,
+      sort: options.sort,
+      expiring: options.expiringSoon ? "1" : undefined,
+    },
     cache: catalogCache(OFFERS_REVALIDATE_SECONDS),
   });
-  return offers;
 }
 
 export async function listStores() {
@@ -95,7 +122,33 @@ export async function getCurrentUser(accessToken: string) {
   }
 }
 
+// ── Contribuição de preços (usuário logado) ────────────────────────────────────────────────────
+
+/** Envia preço + foto (multipart). A API valida e sanitiza a foto; o envio nasce pendente. */
+export function submitContribution(accessToken: string, formData: FormData) {
+  return apiRequest(apiRoutes.contributions, {
+    schema: ContributionCreatedSchema,
+    method: "POST",
+    formData,
+    accessToken,
+  });
+}
+
+/** Envios do próprio usuário (a API só devolve os dele), do mais recente ao mais antigo. */
+export function getMyContributions(accessToken: string, options: { page?: number } = {}) {
+  return apiRequest(apiRoutes.myContributions, {
+    schema: MyContributionsResponseSchema,
+    query: { page: options.page },
+    accessToken,
+  });
+}
+
 // ── Administração ──────────────────────────────────────────────────────────────────────────────
+
+/** Resposta crua com os bytes da foto da etiqueta (só admin); o status é do chamador. */
+export function fetchObservationPhoto(accessToken: string, observationId: string) {
+  return apiFetchBinary(apiRoutes.adminObservationPhoto(observationId), accessToken);
+}
 
 export function getAdminOverview(accessToken: string) {
   return apiRequest(apiRoutes.adminOverview, { schema: AdminOverviewSchema, accessToken });
@@ -108,12 +161,12 @@ export function getPriceFormOptions(accessToken: string) {
   });
 }
 
-export async function getReviewQueue(accessToken: string) {
-  const { observations } = await apiRequest(apiRoutes.adminReviewQueue, {
+export function getReviewQueue(accessToken: string, options: { page?: number } = {}) {
+  return apiRequest(apiRoutes.adminReviewQueue, {
     schema: ReviewQueueResponseSchema,
+    query: { page: options.page },
     accessToken,
   });
-  return observations;
 }
 
 export async function createManualPrice(accessToken: string, request: ManualPriceRequest) {

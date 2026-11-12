@@ -93,7 +93,13 @@ export default async function ProductPage({ params }: Params) {
             Histórico (90 dias)
           </h2>
           <Card className="p-4">
-            <PriceHistory points={history} />
+            <PriceHistory
+              points={history}
+              baseUnit={product.baseUnit}
+              storeNames={Object.fromEntries(
+                prices.map((storePrice) => [storePrice.storeId, storePrice.storeName]),
+              )}
+            />
           </Card>
         </section>
       ) : null}
