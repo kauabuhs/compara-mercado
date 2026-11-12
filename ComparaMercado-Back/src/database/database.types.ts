@@ -2362,6 +2362,34 @@ export type Database = {
           starts_at: string;
         }[];
       };
+      list_offers_page: {
+        Args: {
+          p_expiring?: boolean;
+          p_limit?: number;
+          p_offset?: number;
+          p_query?: string;
+          p_sort?: string;
+          p_store_id?: string;
+        };
+        Returns: {
+          base_unit: Database["public"]["Enums"]["base_unit"];
+          brand: string;
+          canonical_name: string;
+          category_id: string;
+          observed_at: string;
+          price_cents: number;
+          product_id: string;
+          promo: boolean;
+          size_unit: Database["public"]["Enums"]["size_unit"];
+          size_value: number;
+          store_id: string;
+          store_name: string;
+          store_neighborhood: string;
+          total_count: number;
+          unit_price_cents: number;
+          valid_to: string;
+        }[];
+      };
       market_local_to_utc: { Args: { p_local: string; p_market_id: string }; Returns: string };
       money_round: { Args: { p_value: number }; Returns: number };
       price_history: {
@@ -2460,6 +2488,22 @@ export type Database = {
           size_unit: Database["public"]["Enums"]["size_unit"];
           size_value: number;
           store_count: number;
+        }[];
+      };
+      search_products_page: {
+        Args: { p_limit?: number; p_offset?: number; p_only_priced?: boolean; p_query: string };
+        Returns: {
+          base_unit: Database["public"]["Enums"]["base_unit"];
+          brand: string;
+          canonical_name: string;
+          category_id: string;
+          min_unit_price_cents: number;
+          product_id: string;
+          score: number;
+          size_unit: Database["public"]["Enums"]["size_unit"];
+          size_value: number;
+          store_count: number;
+          total_count: number;
         }[];
       };
       set_product_price: {

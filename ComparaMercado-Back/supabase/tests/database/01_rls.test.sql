@@ -25,6 +25,12 @@ insert into auth.users (id, instance_id, aud, role, email) values
   ('cccccccc-0000-4000-8000-0000000000c3', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'admin@test.local');
 update public.profiles set role = 'admin' where id = 'cccccccc-0000-4000-8000-0000000000c3';
 
+-- foto de etiqueta do usuário 1 (todo envio de usuário comum precisa apontar para uma fonte dele)
+insert into public.sources (id, store_id, kind, file_path, sha256, uploaded_by) values
+  ('ffffffff-0000-4000-8000-0000000000f1', 'aaaaaaaa-0000-4000-8000-0000000000a1', 'label',
+   'cccccccc-0000-4000-8000-0000000000c1/teste.jpg', repeat('a', 64),
+   'cccccccc-0000-4000-8000-0000000000c1');
+
 insert into public.price_observations
   (id, store_id, product_id, price_cents, unit_price_cents, source, status, created_by) values
   ('dddddddd-0000-4000-8000-0000000000d1', 'aaaaaaaa-0000-4000-8000-0000000000a1',
@@ -76,9 +82,10 @@ select set_config('request.jwt.claims',
   '{"sub":"cccccccc-0000-4000-8000-0000000000c1","role":"authenticated"}', true);
 
 select lives_ok(
-  $$insert into public.price_observations (store_id, product_id, price_cents, unit_price_cents, source, status, created_by)
+  $$insert into public.price_observations (store_id, product_id, price_cents, unit_price_cents, source, status, created_by, source_id)
     values ('aaaaaaaa-0000-4000-8000-0000000000a1', 'bbbbbbbb-0000-4000-8000-0000000000b1', 350, 1,
-            'label_photo', 'pending', 'cccccccc-0000-4000-8000-0000000000c1')$$,
+            'label_photo', 'pending', 'cccccccc-0000-4000-8000-0000000000c1',
+            'ffffffff-0000-4000-8000-0000000000f1')$$,
   'usuário envia preço pendente por foto de etiqueta');
 select throws_ok(
   $$insert into public.price_observations (store_id, product_id, price_cents, unit_price_cents, source, status, created_by)
@@ -125,15 +132,17 @@ select lives_ok(
 select lives_ok($test$
   do $x$ begin
     for i in 1..28 loop
-      insert into public.price_observations (store_id, product_id, price_cents, unit_price_cents, source, status, created_by)
+      insert into public.price_observations (store_id, product_id, price_cents, unit_price_cents, source, status, created_by, source_id)
       values ('aaaaaaaa-0000-4000-8000-0000000000a1', 'bbbbbbbb-0000-4000-8000-0000000000b1', 100 + i, 1,
-              'label_photo', 'pending', 'cccccccc-0000-4000-8000-0000000000c1');
+              'label_photo', 'pending', 'cccccccc-0000-4000-8000-0000000000c1',
+              'ffffffff-0000-4000-8000-0000000000f1');
     end loop;
   end $x$ $test$, 'usuário chega ao teto diário de 30 contribuições');
 select throws_ok(
-  $$insert into public.price_observations (store_id, product_id, price_cents, unit_price_cents, source, status, created_by)
+  $$insert into public.price_observations (store_id, product_id, price_cents, unit_price_cents, source, status, created_by, source_id)
     values ('aaaaaaaa-0000-4000-8000-0000000000a1', 'bbbbbbbb-0000-4000-8000-0000000000b1', 200, 1,
-            'label_photo', 'pending', 'cccccccc-0000-4000-8000-0000000000c1')$$,
+            'label_photo', 'pending', 'cccccccc-0000-4000-8000-0000000000c1',
+            'ffffffff-0000-4000-8000-0000000000f1')$$,
   '54000', null, 'a 31ª contribuição do dia é barrada');
 
 reset role;
