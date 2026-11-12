@@ -1,4 +1,0 @@
-{
-  "extends": "@compara/config/tsconfig.lib.json",
-  "include": ["src"]
-}
