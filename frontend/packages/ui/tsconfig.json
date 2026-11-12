@@ -1,4 +1,0 @@
-{
-  "extends": "@compara/config/tsconfig.next.json",
-  "include": ["src"]
-}

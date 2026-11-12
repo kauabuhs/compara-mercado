@@ -1,0 +1,465 @@
+/*
+ * Design tokens do Compara Mercado (Tailwind v4) — linguagem "Liquid Glass".
+ * Claro/escuro automáticos pelo sistema; o usuário pode forçar com <html data-theme="light|dark">.
+ * Contraste conferido para WCAG AA (texto >= 4.5:1).
+ *
+ * Princípios:
+ *  - Hierarquia por SUPERFÍCIE, não por contorno: página (background) → cartões (surface) →
+ *    campos/botões discretos (fill). Cartões não têm borda nem sombra.
+ *  - Tudo que flutua (navegação, diálogos, botões de vidro, listas de seleção) usa o material
+ *    `glass`: translúcido, com desfoque e um fio de luz na borda superior (reflexo especular).
+ *  - Divisão interna só por separadores finos (`separator`), como nas listas agrupadas do iOS.
+ *
+ * Mapa semântico (nome do token → papel):
+ *   background / surface / surface-muted ........ fundo da página / cartões / áreas secundárias
+ *   fill / fill-strong .......................... preenchimento translúcido de controles
+ *   brand (primary) / brand-soft ................ ação principal e seu destaque suave
+ *   foreground / muted-foreground ............... texto primário / texto secundário
+ *   separator (border) .......................... divisores finos
+ *   success / warning / danger / info (+ -soft) . estados e avisos
+ *   glass / glass-strong ........................ materiais translúcidos
+ *
+ * Espaçamento: escala de 4 px do Tailwind. Entre blocos de página 8/10/12; entre cartões 3;
+ * dentro de cartões 4/5.
+ * Tipografia: classes `type-*` (display, title, heading, subheading, label, caption).
+ */
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root {
+  --background: oklch(0.965 0.006 260);
+  --surface: oklch(1 0 0);
+  --surface-muted: oklch(0.94 0.006 260);
+  --foreground: oklch(0.2 0.01 260);
+  --muted-foreground: oklch(0.46 0.012 260);
+  --separator: oklch(0.2 0.01 260 / 0.1);
+  --border: var(--separator);
+  --fill: oklch(0.2 0.02 260 / 0.06);
+  --fill-strong: oklch(0.2 0.02 260 / 0.11);
+  --ring: oklch(0.55 0.15 155);
+
+  --brand: oklch(0.5 0.13 155);
+  --brand-foreground: oklch(0.99 0 0);
+  --brand-soft: oklch(0.94 0.045 155);
+  --brand-soft-foreground: oklch(0.36 0.09 155);
+
+  --success: oklch(0.5 0.13 155);
+  --success-soft: oklch(0.94 0.045 155);
+  --success-soft-foreground: oklch(0.36 0.09 155);
+  --warning: oklch(0.7 0.16 65);
+  --warning-soft: oklch(0.96 0.06 85);
+  --warning-soft-foreground: oklch(0.4 0.09 70);
+  --danger: oklch(0.55 0.21 27);
+  --danger-soft: oklch(0.95 0.035 27);
+  --info: oklch(0.55 0.18 255);
+  --info-soft: oklch(0.95 0.03 250);
+  --info-soft-foreground: oklch(0.36 0.1 250);
+
+  /* Liquid glass: translúcido + fio de luz no topo + contorno interno quase invisível. */
+  --glass: oklch(1 0 0 / 0.55);
+  --glass-strong: oklch(1 0 0 / 0.78);
+  --glass-edge: inset 0 0 0 0.5px oklch(0.2 0.02 260 / 0.07), inset 0 1px 0 0 oklch(1 0 0 / 0.9);
+  --glass-float: 0 12px 40px -14px oklch(0.2 0.03 260 / 0.28);
+  --glass-blur: blur(28px) saturate(1.9);
+
+  /* Fundo ambiente: manchas de cor suaves que dão o que "refratar" ao vidro. */
+  --ambient-a: oklch(0.85 0.1 155 / 0.34);
+  --ambient-b: oklch(0.84 0.09 250 / 0.3);
+  --ambient-c: oklch(0.9 0.09 80 / 0.28);
+
+  /* Tom do avatar de produto (a matiz vem de cada item). */
+  --tint-bg-l: 0.93;
+  --tint-fg-l: 0.4;
+
+  --radius: 0.875rem;
+
+  /* Navegação flutuante (mobile/tablet): dimensões e área reservada ao conteúdo. */
+  --nav-height: 3.75rem;
+  /* Distância da pílula até a borda; em iPhones com barra home, encosta nela sem colar. */
+  --nav-bottom: max(0.75rem, calc(env(safe-area-inset-bottom) - 0.25rem));
+  /* Espaço que o conteúdo reserva embaixo para a pílula nunca cobrir nada. */
+  --nav-clearance: calc(var(--nav-height) + var(--nav-bottom) + 1.5rem);
+  --sidebar-width: 16rem;
+  --page-gutter: 1rem;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: oklch(0.14 0.008 260);
+    --surface: oklch(0.2 0.01 260);
+    --surface-muted: oklch(0.24 0.01 260);
+    --foreground: oklch(0.96 0.003 106);
+    --muted-foreground: oklch(0.72 0.01 260);
+    --separator: oklch(1 0 0 / 0.1);
+    --fill: oklch(1 0 0 / 0.08);
+    --fill-strong: oklch(1 0 0 / 0.14);
+    --ring: oklch(0.72 0.15 155);
+
+    --brand: oklch(0.72 0.15 155);
+    --brand-foreground: oklch(0.18 0.02 155);
+    --brand-soft: oklch(0.3 0.06 155);
+    --brand-soft-foreground: oklch(0.9 0.06 155);
+
+    --success: oklch(0.72 0.15 155);
+    --success-soft: oklch(0.3 0.06 155);
+    --success-soft-foreground: oklch(0.9 0.06 155);
+    --warning: oklch(0.8 0.15 75);
+    --warning-soft: oklch(0.32 0.05 80);
+    --warning-soft-foreground: oklch(0.92 0.07 85);
+    --danger: oklch(0.72 0.17 25);
+    --danger-soft: oklch(0.3 0.06 25);
+    --info: oklch(0.75 0.13 250);
+    --info-soft: oklch(0.3 0.05 250);
+    --info-soft-foreground: oklch(0.9 0.05 250);
+
+    --glass: oklch(0.32 0.012 260 / 0.5);
+    --glass-strong: oklch(0.3 0.012 260 / 0.74);
+    --glass-edge: inset 0 0 0 0.5px oklch(1 0 0 / 0.14), inset 0 1px 0 0 oklch(1 0 0 / 0.2);
+    --glass-float: 0 14px 44px -14px oklch(0 0 0 / 0.7);
+
+    --ambient-a: oklch(0.5 0.12 155 / 0.3);
+    --ambient-b: oklch(0.45 0.13 255 / 0.28);
+    --ambient-c: oklch(0.5 0.1 70 / 0.16);
+
+    --tint-bg-l: 0.32;
+    --tint-fg-l: 0.88;
+  }
+}
+
+[data-theme="dark"] {
+  --background: oklch(0.14 0.008 260);
+  --surface: oklch(0.2 0.01 260);
+  --surface-muted: oklch(0.24 0.01 260);
+  --foreground: oklch(0.96 0.003 106);
+  --muted-foreground: oklch(0.72 0.01 260);
+  --separator: oklch(1 0 0 / 0.1);
+  --fill: oklch(1 0 0 / 0.08);
+  --fill-strong: oklch(1 0 0 / 0.14);
+  --ring: oklch(0.72 0.15 155);
+
+  --brand: oklch(0.72 0.15 155);
+  --brand-foreground: oklch(0.18 0.02 155);
+  --brand-soft: oklch(0.3 0.06 155);
+  --brand-soft-foreground: oklch(0.9 0.06 155);
+
+  --success: oklch(0.72 0.15 155);
+  --success-soft: oklch(0.3 0.06 155);
+  --success-soft-foreground: oklch(0.9 0.06 155);
+  --warning: oklch(0.8 0.15 75);
+  --warning-soft: oklch(0.32 0.05 80);
+  --warning-soft-foreground: oklch(0.92 0.07 85);
+  --danger: oklch(0.72 0.17 25);
+  --danger-soft: oklch(0.3 0.06 25);
+  --info: oklch(0.75 0.13 250);
+  --info-soft: oklch(0.3 0.05 250);
+  --info-soft-foreground: oklch(0.9 0.05 250);
+
+  --glass: oklch(0.32 0.012 260 / 0.5);
+  --glass-strong: oklch(0.3 0.012 260 / 0.74);
+  --glass-edge: inset 0 0 0 0.5px oklch(1 0 0 / 0.14), inset 0 1px 0 0 oklch(1 0 0 / 0.2);
+  --glass-float: 0 14px 44px -14px oklch(0 0 0 / 0.7);
+
+  --ambient-a: oklch(0.5 0.12 155 / 0.3);
+  --ambient-b: oklch(0.45 0.13 255 / 0.28);
+  --ambient-c: oklch(0.5 0.1 70 / 0.16);
+
+  --tint-bg-l: 0.32;
+  --tint-fg-l: 0.88;
+}
+
+/* Quem pede menos transparência recebe superfícies opacas (acessibilidade do sistema). */
+@media (prefers-reduced-transparency: reduce) {
+  :root:not([data-theme="x"]) {
+    --glass: var(--surface);
+    --glass-strong: var(--surface);
+    --glass-blur: none;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-separator: var(--separator);
+  --color-fill: var(--fill);
+  --color-fill-strong: var(--fill-strong);
+  --color-ring: var(--ring);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-soft-foreground: var(--brand-soft-foreground);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-success-soft-foreground: var(--success-soft-foreground);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-soft-foreground: var(--warning-soft-foreground);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-info-soft-foreground: var(--info-soft-foreground);
+  --color-glass: var(--glass);
+  --color-glass-strong: var(--glass-strong);
+
+  /* Raios (continuous corners): campos e botões em cápsula; cartões 1.25rem; diálogos 1.75rem. */
+  --radius-xl: var(--radius);
+  --radius-2xl: calc(var(--radius) + 0.375rem);
+  --radius-3xl: calc(var(--radius) + 0.875rem);
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "SF Pro Text", "Segoe UI", Inter, Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+
+  --animate-fade-in: fade-in 240ms var(--ease-out) both;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Escala tipográfica: use estas classes em vez de combinar tamanho/peso em cada página. */
+@utility type-display {
+  @apply text-4xl font-semibold tracking-tight text-balance md:text-5xl;
+}
+@utility type-title {
+  @apply text-3xl font-bold tracking-tight text-balance md:text-4xl;
+}
+@utility type-heading {
+  @apply text-xl font-semibold tracking-tight;
+}
+@utility type-subheading {
+  @apply text-lg font-medium;
+}
+@utility type-label {
+  @apply text-sm font-medium;
+}
+@utility type-caption {
+  @apply text-sm text-muted-foreground;
+}
+
+/* Margens laterais da página, respeitando o entalhe/cantos em paisagem. */
+@utility page-gutter {
+  padding-left: max(var(--page-gutter), env(safe-area-inset-left));
+  padding-right: max(var(--page-gutter), env(safe-area-inset-right));
+  @media (min-width: 48rem) {
+    --page-gutter: 2rem;
+  }
+}
+
+/* Liquid glass: vidro translúcido que desfoca e satura o que passa por trás. Sem sombra de queda. */
+@utility glass {
+  background-color: var(--surface);
+  box-shadow: var(--glass-edge);
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    background-color: var(--glass);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+  }
+}
+
+/* Vidro que flutua sobre o conteúdo (navegação, diálogos, listas de seleção): ganha uma
+   sombra ambiente bem difusa só para se destacar do que está embaixo. */
+@utility glass-float {
+  background-color: var(--surface);
+  box-shadow: var(--glass-edge), var(--glass-float);
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    background-color: var(--glass-strong);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+  }
+}
+
+/* Avatar de produto: a matiz (--hue) sai do nome do item; claro/escuro vêm dos tokens --tint-*. */
+@utility tint {
+  background-color: oklch(var(--tint-bg-l) 0.06 var(--hue, 155));
+  color: oklch(var(--tint-fg-l) 0.12 var(--hue, 155));
+}
+
+@layer components {
+  /* ===== Diálogos nativos (<dialog>): foco preso, Esc, fundo inerte e camada superior de graça ===== */
+  .dialog {
+    margin: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--foreground);
+    max-width: none;
+    max-height: none;
+    overflow: visible;
+    opacity: 0;
+    transform: var(--dialog-to);
+    transition:
+      opacity 220ms var(--ease-out),
+      transform 320ms var(--ease-out),
+      overlay 320ms allow-discrete,
+      display 320ms allow-discrete;
+  }
+  .dialog[open] {
+    opacity: 1;
+    transform: none;
+  }
+  @starting-style {
+    .dialog[open] {
+      opacity: 0;
+      transform: var(--dialog-from);
+    }
+  }
+  .dialog::backdrop {
+    background-color: transparent;
+    -webkit-backdrop-filter: blur(0);
+    backdrop-filter: blur(0);
+    transition:
+      background-color 300ms var(--ease-out),
+      backdrop-filter 300ms var(--ease-out),
+      overlay 320ms allow-discrete,
+      display 320ms allow-discrete;
+  }
+  .dialog[open]::backdrop {
+    background-color: oklch(0 0 0 / 0.3);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+  }
+  @starting-style {
+    .dialog[open]::backdrop {
+      background-color: transparent;
+      -webkit-backdrop-filter: blur(0);
+      backdrop-filter: blur(0);
+    }
+  }
+
+  /* Estilo 1 — Alerta: painel central compacto; entra "de cima" (escala 1.1 → 1), como no iOS. */
+  .dialog-alert {
+    --dialog-from: scale(1.1);
+    --dialog-to: scale(0.94);
+    width: min(calc(100% - 3rem), 17.5rem);
+  }
+
+  /* Estilo 2 — Action sheet: dois blocos de vidro ancorados embaixo; sobem da borda da tela. */
+  .dialog-sheet {
+    --dialog-from: translateY(calc(100% + 1rem));
+    --dialog-to: translateY(calc(100% + 1rem));
+    width: min(calc(100% - 1rem), 26rem);
+    margin: auto auto max(0.5rem, env(safe-area-inset-bottom)) auto;
+  }
+}
+
+@layer base {
+  html {
+    color-scheme: light dark;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Elementos focados por teclado não ficam escondidos atrás da navegação flutuante. */
+  @media (max-width: 63.999rem) {
+    html {
+      scroll-padding-bottom: var(--nav-clearance);
+    }
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+  }
+  body {
+    background: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Fundo ambiente fixo atrás de tudo: dá cor para o vidro desfocar. Decorativo. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(42rem 32rem at 8% -6%, var(--ambient-a), transparent 70%),
+      radial-gradient(38rem 30rem at 100% 12%, var(--ambient-b), transparent 70%),
+      radial-gradient(40rem 28rem at 70% 108%, var(--ambient-c), transparent 70%);
+  }
+  a,
+  button,
+  select,
+  summary,
+  [role="button"] {
+    touch-action: manipulation;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+
+  /* Select com lista de vidro onde o navegador permite estilizar o seletor (Chromium 135+);
+     nos demais continua o seletor nativo do sistema, que já é translúcido no iOS/macOS. */
+  @supports (appearance: base-select) {
+    .field-select,
+    .field-select::picker(select) {
+      appearance: base-select;
+    }
+    .field-select::picker-icon {
+      display: none;
+    }
+    .field-select::picker(select) {
+      margin-block: 0.5rem;
+      padding: 0.375rem;
+      border: 0;
+      border-radius: 1.25rem;
+      background-color: var(--glass-strong);
+      box-shadow: var(--glass-edge), var(--glass-float);
+      -webkit-backdrop-filter: var(--glass-blur);
+      backdrop-filter: var(--glass-blur);
+      color: var(--foreground);
+    }
+    .field-select option {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      min-height: 2.75rem;
+      padding: 0.5rem 0.875rem;
+      border-radius: 0.875rem;
+      font-size: 1rem;
+    }
+    .field-select option:hover,
+    .field-select option:focus-visible {
+      background-color: var(--fill-strong);
+      outline: none;
+    }
+    .field-select option:checked {
+      background-color: var(--brand-soft);
+      color: var(--brand-soft-foreground);
+      font-weight: 600;
+    }
+    .field-select option::checkmark {
+      order: 1;
+      margin-left: auto;
+    }
+  }
+
+  /* Respeita a preferência de movimento reduzido */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      /* biome-ignore lint/complexity/noImportantStyles: padrão para movimento reduzido (a11y) */
+      animation-duration: 0.01ms !important;
+      /* biome-ignore lint/complexity/noImportantStyles: padrão para movimento reduzido (a11y) */
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

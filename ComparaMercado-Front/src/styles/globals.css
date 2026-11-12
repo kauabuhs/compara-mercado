@@ -1,0 +1,123 @@
+@import "./tokens.css";
+@import "maplibre-gl/dist/maplibre-gl.css";
+
+/* ===== Mapa dos mercados (MapLibre) ===== */
+
+/* Modo escuro do mapa: inverte só a camada do mapa (pinos e controles são elementos à parte). */
+:root[data-theme="dark"] .map-canvas .maplibregl-canvas {
+  filter: invert(1) hue-rotate(180deg) brightness(0.92) saturate(0.8);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .map-canvas .maplibregl-canvas {
+    filter: invert(1) hue-rotate(180deg) brightness(0.92) saturate(0.8);
+  }
+}
+
+/* Créditos exigidos pela licença dos dados, no mesmo vidro do resto da interface. */
+.map-canvas .maplibregl-ctrl-attrib.maplibregl-compact {
+  margin: 0.75rem;
+  border-radius: 9999px;
+  background-color: var(--glass-strong);
+  color: var(--foreground);
+  box-shadow: var(--glass-edge);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+.map-canvas .maplibregl-ctrl-attrib a {
+  color: inherit;
+}
+.map-canvas .maplibregl-ctrl-attrib-button {
+  width: 2rem;
+  height: 2rem;
+}
+@media (pointer: coarse) {
+  .map-canvas .maplibregl-ctrl-attrib-button {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+}
+
+/* Pino de mercado: alvo de toque de 44 px; a escala fica no corpo (o MapLibre move o botão). */
+.store-pin {
+  display: block;
+  width: 2.75rem;
+  height: 2.9rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.store-pin__body {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  margin: 0 auto;
+  border-radius: 9999px;
+  background: var(--brand);
+  color: var(--brand-foreground);
+  box-shadow:
+    0 0 0 3px #fff,
+    0 6px 14px -4px rgb(0 0 0 / 0.45);
+  transform-origin: 50% 100%;
+  transition:
+    transform 250ms var(--ease-out),
+    background-color 200ms;
+}
+.store-pin__body::after {
+  content: "";
+  position: absolute;
+  bottom: -0.3rem;
+  left: 50%;
+  width: 0.6rem;
+  height: 0.6rem;
+  background: inherit;
+  border-radius: 0 0 0.15rem 0;
+  transform: translateX(-50%) rotate(45deg);
+  z-index: -1;
+}
+.store-pin:hover .store-pin__body {
+  transform: scale(1.08);
+}
+.store-pin[data-selected="true"] .store-pin__body {
+  transform: scale(1.25);
+  background: var(--foreground);
+  color: var(--background);
+}
+.store-pin:focus-visible {
+  outline: none;
+}
+.store-pin:focus-visible .store-pin__body {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+/* Ponto azul da posição do usuário, com pulso discreto. */
+.user-dot {
+  position: relative;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 9999px;
+  background: oklch(0.6 0.2 255);
+  box-shadow: 0 0 0 3px #fff;
+}
+.user-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: inherit;
+  animation: user-pulse 2s ease-out infinite;
+}
+@keyframes user-pulse {
+  from {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  to {
+    transform: scale(3.2);
+    opacity: 0;
+  }
+}
