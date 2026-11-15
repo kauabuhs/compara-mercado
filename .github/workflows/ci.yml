@@ -105,13 +105,17 @@ jobs:
         run: supabase test db --workdir ComparaMercado-Back
       - name: Os tipos gerados estão em dia com as migrações?
         run: |
-          supabase gen types typescript --schema public --workdir ComparaMercado-Back > /tmp/database.types.ts
-          diff -u ComparaMercado-Back/src/database/database.types.ts /tmp/database.types.ts \
-            || { echo "::error::ComparaMercado-Back/src/database/database.types.ts desatualizado. Rode 'pnpm db:types'."; exit 1; }
+          # Mesmo comando e mesma versão do CLI (a do lockfile) de quem roda `pnpm db:types` localmente:
+          # a saída do gerador muda de formato entre versões do CLI, e `latest` geraria diff falso.
+          pnpm db:types
+          git diff --exit-code -- ComparaMercado-Back/src/database/database.types.ts \
+            || { echo "::error::ComparaMercado-Back/src/database/database.types.ts desatualizado. Rode 'pnpm db:types' e commite."; exit 1; }
       - name: "Integração com o banco (db: paridade SQL ↔ TypeScript; api: rotas reais com login de admin)"
         run: |
           eval "$(supabase status -o env --workdir ComparaMercado-Back | sed 's/^/export /')"
           export SUPABASE_TEST_URL="$API_URL" SUPABASE_TEST_ANON_KEY="$ANON_KEY"
+          # Usuários de teste já confirmados (o cadastro real exige confirmar o e-mail): só no Supabase local
+          export SUPABASE_TEST_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
           # Admin do seed LOCAL (só existe no Supabase local; nunca em staging/produção)
           export SUPABASE_TEST_ADMIN_EMAIL="admin@local.test" SUPABASE_TEST_ADMIN_PASSWORD="admin123456"
           # Conexão direta ao Postgres: testes do Drizzle (espelho do schema e concorrência real de estoque/promoção)

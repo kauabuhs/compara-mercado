@@ -136,9 +136,18 @@ for (const [filePath, fileImports] of imports) {
 
 // R4 — regras de negócio puras: sem framework, banco, rede, Node nem camadas de infraestrutura
 const PURE_FILES = new Set([
-  ...["domain-error", "freshness", "gtin", "money", "normalize", "units"].map(
-    (name) => `${BACK_SRC}/lib/${name}.ts`,
-  ),
+  ...[
+    "cursor",
+    "domain-error",
+    "freshness",
+    "gtin",
+    "list-sync",
+    "money",
+    "normalize",
+    "phone",
+    "reputation",
+    "units",
+  ].map((name) => `${BACK_SRC}/lib/${name}.ts`),
   `${BACK_SRC}/modules/catalog/service/compare.ts`,
   `${BACK_SRC}/modules/contributions/service/jpeg.ts`,
   ...["golden", "match", "publish", "trigram", "validate"].map(
