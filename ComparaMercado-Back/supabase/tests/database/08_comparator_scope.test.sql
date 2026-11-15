@@ -2,7 +2,7 @@
 -- outros países/mercados cadastradas e ativas.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(4);
+select plan(5);
 
 insert into public.cities (id, ibge_code, name, uf, active) values
   ('aaaaaaaa-8000-4000-8000-000000000001', '9999998', 'Cidade Ativa', 'RS', true),
@@ -12,6 +12,10 @@ insert into public.stores (id, city_id, name, location, status) values
     extensions.st_makepoint(-51.18, -29.17)::extensions.geography, 'active'),
   ('aaaaaaaa-8000-4000-8000-0000000000a2', 'aaaaaaaa-8000-4000-8000-000000000002', 'Loja em cidade inativa',
     extensions.st_makepoint(-51.19, -29.18)::extensions.geography, 'active');
+-- Inserir loja ativa habilita a cidade (gatilho, ADR-0014): confere e simula o admin desabilitando.
+select ok((select active from public.cities where id = 'aaaaaaaa-8000-4000-8000-000000000002'),
+  'a primeira loja ativa habilita a cidade sozinha');
+update public.cities set active = false where id = 'aaaaaaaa-8000-4000-8000-000000000002';
 insert into public.products (id, canonical_name, size_value, size_unit)
 values ('bbbbbbbb-8000-4000-8000-0000000000b1', 'Produto Escopo', 1, 'kg');
 insert into public.price_observations (store_id, product_id, price_cents, unit_price_cents, source, status) values
@@ -30,8 +34,8 @@ select is((select j -> 'best_single' ->> 'store_id' from r), 'aaaaaaaa-8000-4000
   'o melhor mercado nunca vem de cidade desabilitada');
 
 set local role anon;
-select is((select count(*)::int from public.cities where id = 'aaaaaaaa-8000-4000-8000-000000000002'), 0,
-  'público não vê a cidade inativa (RLS)');
+select is((select count(*)::int from public.cities where id = 'aaaaaaaa-8000-4000-8000-000000000002'), 1,
+  'a biblioteca é pública: o visitante enxerga também a cidade desabilitada');
 reset role;
 
 select * from finish();

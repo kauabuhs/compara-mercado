@@ -2,7 +2,7 @@
 -- Fixtures próprias; transação revertida.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(23);
+select plan(24);
 
 -- ── Fixtures (como postgres, ignora RLS) ────────────────────────────────────
 insert into public.cities (id, ibge_code, name, uf, active)
@@ -59,15 +59,18 @@ select throws_ok(
   $$insert into storage.objects (bucket_id, name)
     values ('contributions', 'cccccccc-9000-4000-8000-0000000000c2/invasao.jpg')$$,
   '42501', null, 'usuário não grava na pasta de outro');
-select is((select count(*)::int from storage.objects where bucket_id = 'contributions'), 2,
-  'usuário vê só as próprias fotos (a antiga e a nova)');
+-- (só a pasta dele: fotos de publicações visíveis no feed são legíveis por todos os logados, ADR-0010)
+select is((select count(*)::int from storage.objects
+           where bucket_id = 'contributions' and name like 'cccccccc-9000-4000-8000-0000000000c1/%'),
+  2, 'usuário vê as próprias fotos (a antiga e a nova)');
 -- DELETE direto é barrado pelo próprio Supabase (protect_delete); pela Storage API a barreira é a
 -- ausência de política de DELETE, coberta no teste de integração da API.
 select throws_ok(
   $$delete from storage.objects where bucket_id = 'contributions'$$,
   '42501', null, 'exclusão direta de fotos é bloqueada');
-select is((select count(*)::int from storage.objects where bucket_id = 'contributions'), 2,
-  'usuário não consegue apagar o comprovante depois de enviar');
+select is((select count(*)::int from storage.objects
+           where bucket_id = 'contributions' and name like 'cccccccc-9000-4000-8000-0000000000c1/%'),
+  2, 'usuário não consegue apagar o comprovante depois de enviar');
 
 select lives_ok(
   $$insert into public.sources (id, store_id, kind, file_path, sha256, uploaded_by)
@@ -138,20 +141,25 @@ select throws_ok(
   '23503', null, 'não se contribui para produto arquivado (o usuário nem o enxerga)');
 reset role;
 
--- ── Usuário 2 não enxerga nada do usuário 1 ─────────────────────────────────
+-- ── Usuário 2 só enxerga do usuário 1 o que está numa publicação do feed ───
+-- (ADR-0010: a foto de um preço visível para a comunidade pode ser vista por quem está logado;
+-- qualquer outra foto continua privada.)
 set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"cccccccc-9000-4000-8000-0000000000c2","role":"authenticated"}', true);
 select is((select count(*)::int from storage.objects
-           where bucket_id = 'contributions' and name like 'cccccccc-9000-4000-8000-0000000000c1/%'),
-  0, 'usuário não vê as fotos de outro');
+           where bucket_id = 'contributions' and name = 'cccccccc-9000-4000-8000-0000000000c1/nova.jpg'),
+  1, 'a foto de uma publicação visível no feed é legível por outra pessoa logada');
+select is((select count(*)::int from storage.objects
+           where bucket_id = 'contributions' and name = 'cccccccc-9000-4000-8000-0000000000c1/fixture.jpg'),
+  0, 'foto que não está em nenhuma publicação continua privada');
 reset role;
 
 -- ── Admin lê tudo (revisão com a foto) ──────────────────────────────────────
 set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"cccccccc-9000-4000-8000-0000000000c3","role":"authenticated"}', true);
-select is((select count(*)::int from storage.objects where bucket_id = 'contributions'), 3,
+select cmp_ok((select count(*)::int from storage.objects where bucket_id = 'contributions'), '>=', 3,
   'admin vê as fotos de todos os usuários');
 reset role;
 

@@ -2,9 +2,18 @@
 -- Roda apenas em `supabase db reset`. Nunca é aplicado em staging ou produção.
 
 -- ── Cidade piloto ───────────────────────────────────────────────────────────
-insert into public.cities (id, ibge_code, name, uf, active) values
-  ('10000000-0000-4000-8000-000000000001', '4305108', 'Caxias do Sul', 'RS', true),
-  ('10000000-0000-4000-8000-000000000002', '4314803', 'Passo Fundo',    'RS', false);
+-- Todos os municípios do IBGE já existem (migração 20261115000001); o seed só fixa os IDs usados
+-- pelas demonstrações e pelos testes e habilita a cidade piloto. Nada referencia as cidades ainda.
+update public.cities set id = '10000000-0000-4000-8000-000000000001', active = true
+ where ibge_code = '4305108';   -- Caxias do Sul/RS
+update public.cities set id = '10000000-0000-4000-8000-000000000002'
+ where ibge_code = '4314100';   -- Passo Fundo/RS (fica desabilitada: sem mercados)
+
+-- Centro de cada cidade: ponto de partida do mapa e do "perto de mim" quando não há GPS.
+update public.cities set center = extensions.st_makepoint(-51.1794, -29.1678)::extensions.geography
+ where id = '10000000-0000-4000-8000-000000000001';
+update public.cities set center = extensions.st_makepoint(-52.4091, -28.2628)::extensions.geography
+ where id = '10000000-0000-4000-8000-000000000002';
 
 -- ── 6 mercados fictícios (lon, lat) ─────────────────────────────────────────
 insert into public.stores (id, city_id, name, address, neighborhood, location, status, opening_hours) values
@@ -148,4 +157,6 @@ values (
   jsonb_build_object('sub', '40000000-0000-4000-8000-0000000000a1', 'email', 'admin@local.test'),
   'email', now(), now(), now()
 );
-update public.profiles set role = 'admin' where id = '40000000-0000-4000-8000-0000000000a1';
+update public.profiles
+  set role = 'admin', terms_version = '2026-11', terms_accepted_at = now()
+  where id = '40000000-0000-4000-8000-0000000000a1';
