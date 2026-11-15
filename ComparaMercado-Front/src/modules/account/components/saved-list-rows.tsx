@@ -1,59 +1,30 @@
 "use client";
 
-import { ListChecks, Trash2 } from "lucide-react";
+import { ListChecks } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
 import { RowContent, rowClass } from "@/components/ui/controls";
-import { ConfirmDialog } from "@/components/ui/dialog";
 import { GroupRow, IconTile } from "@/components/ui/primitives";
-import { listActions, useList } from "@/stores/shopping-list.store";
+import { useList, useListSyncState } from "@/stores/shopping-list.store";
 
-/** Linhas da conta sobre a lista de compras, que vive só neste aparelho. */
-export function SavedListRows() {
-  const items = useList();
-  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const count = items.length;
-  const countLabel = count === 0 ? "vazia" : `${count} ${count === 1 ? "item" : "itens"}`;
-
+/** Atalho para a lista de compras, com a contagem de itens e onde ela está guardada. */
+export function SavedListRow() {
+  const count = useList().length;
+  const { signedIn } = useListSyncState();
+  // A contagem vai na descrição (não à direita): assim o título nunca é cortado em tela estreita.
+  const status = count === 0 ? "Vazia" : `${count} ${count === 1 ? "item" : "itens"}`;
+  // Enquanto não sabemos se a sincronização funcionou, não afirmamos onde está a lista.
+  const where =
+    signedIn === null ? "" : signedIn ? " · salva na sua conta" : " · salva neste aparelho";
   return (
-    <>
-      <GroupRow>
-        <Link href="/lista" className={rowClass}>
-          <RowContent
-            icon={<IconTile icon={ListChecks} tone="brand" />}
-            title="Minha lista de compras"
-            description="Salva neste aparelho, funciona sem internet"
-            trailing={countLabel}
-            chevron
-          />
-        </Link>
-      </GroupRow>
-      {count > 0 ? (
-        <GroupRow>
-          <button
-            type="button"
-            aria-haspopup="dialog"
-            onClick={() => setIsConfirmOpen(true)}
-            className={rowClass}
-          >
-            <RowContent
-              icon={<IconTile icon={Trash2} tone="danger" />}
-              title="Limpar lista salva"
-              tone="danger"
-            />
-          </button>
-        </GroupRow>
-      ) : null}
-      <ConfirmDialog
-        variant="sheet"
-        open={isConfirmOpen}
-        onOpenChange={setIsConfirmOpen}
-        title="Limpar a lista inteira?"
-        description={`${count} ${count === 1 ? "item será removido" : "itens serão removidos"} deste aparelho. Isso não pode ser desfeito.`}
-        confirmLabel="Limpar lista"
-        destructive
-        onConfirm={() => listActions.clear()}
-      />
-    </>
+    <GroupRow>
+      <Link href="/lista" className={rowClass}>
+        <RowContent
+          icon={<IconTile icon={ListChecks} tone="brand" />}
+          title="Minha lista de compras"
+          description={`${status}${where}`}
+          chevron
+        />
+      </Link>
+    </GroupRow>
   );
 }

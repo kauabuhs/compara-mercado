@@ -15,9 +15,13 @@ export interface DetailSheetProps {
 const DISMISS_DISTANCE_PX = 110;
 const DISMISS_VELOCITY = 0.6;
 
+/** Mesmo breakpoint `lg` do app: a partir dele o sheet vira um modal centralizado. */
+const DESKTOP_QUERY = "(min-width: 64rem)";
+
 /**
- * Sheet de detalhes que sobe de baixo para cima, como os do iOS: alça, título, botão de fechar e
- * corpo rolável. Fecha com Esc, toque no fundo, botão ou arrastando a alça/cabeçalho para baixo.
+ * Sheet de detalhes. No mobile sobe de baixo para cima, como os do iOS: alça, título, botão de
+ * fechar e corpo rolável; fecha com Esc, toque no fundo, botão ou arrastando a alça/cabeçalho para
+ * baixo. No desktop abre como modal centralizado, sem alça nem arraste.
  * Usa o <dialog> nativo (foco preso, fundo inerte, anunciado como modal).
  */
 export function DetailSheet({ open, onOpenChange, title, children }: DetailSheetProps) {
@@ -27,6 +31,7 @@ export function DetailSheet({ open, onOpenChange, title, children }: DetailSheet
 
   function onPointerDown(event: PointerEvent<HTMLDivElement>) {
     if (event.button !== 0 || (event.target as HTMLElement).closest("button")) return;
+    if (window.matchMedia(DESKTOP_QUERY).matches) return; // centralizado: sem arrastar
     event.currentTarget.setPointerCapture(event.pointerId);
     drag.current = { startY: event.clientY, startTime: event.timeStamp, offset: 0 };
     const dialog = ref.current;
@@ -61,17 +66,20 @@ export function DetailSheet({ open, onOpenChange, title, children }: DetailSheet
 
   return (
     <dialog {...dialogProps} aria-labelledby={titleId} className="dialog dialog-detail">
-      <div className="glass-float flex max-h-[85dvh] flex-col overflow-hidden rounded-t-[1.75rem]">
+      <div className="glass-float flex max-h-[85dvh] flex-col overflow-hidden rounded-t-[1.75rem] lg:max-h-[80dvh] lg:rounded-[1.75rem]">
         {/* Alça + título: toda esta faixa é a área de arrastar. */}
         <div
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
-          className="shrink-0 cursor-grab touch-none select-none active:cursor-grabbing"
+          className="shrink-0 cursor-grab touch-none select-none active:cursor-grabbing lg:cursor-default lg:touch-auto lg:select-text lg:active:cursor-default"
         >
-          <div aria-hidden className="mx-auto mt-2.5 h-1.5 w-10 rounded-full bg-fill-strong" />
-          <div className="flex items-center justify-between gap-2 pr-2 pl-5">
+          <div
+            aria-hidden
+            className="mx-auto mt-2.5 h-1.5 w-10 rounded-full bg-fill-strong lg:hidden"
+          />
+          <div className="flex items-center justify-between gap-2 pr-2 pl-5 lg:pt-2">
             <h2 id={titleId} className="py-3 text-lg font-semibold">
               {title}
             </h2>

@@ -1,13 +1,13 @@
 "use client";
 
-import { Home, ListChecks, MapPin, Tag, User } from "lucide-react";
+import { Home, ListChecks, MapPin, User, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const ITEMS = [
   { href: "/", label: "Início", icon: Home },
-  { href: "/ofertas", label: "Ofertas", icon: Tag },
+  { href: "/comunidade", label: "Comunidade", icon: Users },
   { href: "/lista", label: "Lista", icon: ListChecks },
   { href: "/mercados", label: "Mercados", icon: MapPin },
   { href: "/conta", label: "Conta", icon: User },

@@ -37,7 +37,7 @@ export default async function MyContributionsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const accessToken = await getAccessToken();
-  if (!accessToken) redirect("/conta");
+  if (!accessToken) redirect("/entrar?next=/conta/envios");
   const page = parsePage((await searchParams)[PAGE_PARAM]);
   const result = await getMyContributions(accessToken, { page });
 
@@ -45,7 +45,7 @@ export default async function MyContributionsPage({
     <div className="mx-auto w-full max-w-xl space-y-4">
       <PageHeader
         title="Meus envios"
-        description="Cada preço fica em análise até um revisor conferir a foto."
+        description="Cada preço fica em análise, visível como não confirmado, até outras pessoas o confirmarem ou a equipe o aprovar."
       />
       {result.contributions.length === 0 ? (
         <EmptyState
@@ -74,6 +74,9 @@ export default async function MyContributionsPage({
                       {dateTimeFormatter.format(new Date(contribution.createdAt))}
                     </p>
                     <Badge tone={status.tone}>{status.label}</Badge>
+                    {contribution.reviewNote ? (
+                      <p className="type-caption">Motivo: {contribution.reviewNote}</p>
+                    ) : null}
                   </div>
                   <p className="text-xl font-semibold tabular-nums">
                     {formatBRL(contribution.priceCents)}

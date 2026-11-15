@@ -52,7 +52,7 @@ export function ThemeSelector() {
       value={theme}
       options={OPTIONS}
       onChange={chooseTheme}
-      className="w-full"
+      compact
     />
   );
 }

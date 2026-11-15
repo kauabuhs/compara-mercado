@@ -65,9 +65,9 @@ test("lista vazia mostra estado vazio com próximo passo", async ({ page }) => {
   await expect(page.getByRole("link", { name: "Buscar produtos" })).toBeVisible();
 });
 
-test("/admin exige login: visitante anônimo é redirecionado", async ({ page }) => {
+test("/admin exige login: visitante anônimo é levado a entrar", async ({ page }) => {
   await page.goto("/admin");
-  await expect(page).toHaveURL(/\/conta$/);
+  await expect(page).toHaveURL(/\/entrar\?next=\/admin$/);
 });
 
 test("manifest PWA e cabeçalhos de segurança", async ({ request }) => {

@@ -9,7 +9,7 @@ export type DialogStyle = "alert" | "sheet";
 export interface ConfirmDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** `alert`: painel central compacto. `sheet`: action sheet ancorada embaixo. */
+  /** `alert`: painel central compacto. `sheet`: action sheet ancorada embaixo no mobile e centralizada no desktop. */
   variant?: DialogStyle;
   title: string;
   description?: ReactNode;

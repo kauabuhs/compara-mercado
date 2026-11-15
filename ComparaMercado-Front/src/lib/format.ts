@@ -82,3 +82,22 @@ export function formatSize(sizeValue: number, sizeUnit: string): string {
     : String(sizeValue).replace(".", ",");
   return `${formattedValue} ${sizeUnit}`;
 }
+
+const MINUTE_MS = 60_000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+
+/**
+ * "agora", "há 12 min", "há 3 h", "há 2 dias": idade de uma publicação. `now` existe para os
+ * testes e para a tela mostrar sempre o mesmo instante em toda a lista.
+ */
+export function formatTimeAgo(isoDate: string, now: number = Date.now()): string {
+  const published = new Date(isoDate).getTime();
+  if (Number.isNaN(published)) return "";
+  const elapsed = Math.max(0, now - published);
+  if (elapsed < MINUTE_MS) return "agora";
+  if (elapsed < HOUR_MS) return `há ${Math.floor(elapsed / MINUTE_MS)} min`;
+  if (elapsed < DAY_MS) return `há ${Math.floor(elapsed / HOUR_MS)} h`;
+  const days = Math.floor(elapsed / DAY_MS);
+  return days === 1 ? "há 1 dia" : `há ${days} dias`;
+}

@@ -44,6 +44,9 @@ export default defineConfig({
       env: {
         ...(process.env as Record<string, string>),
         API_URL: `http://127.0.0.1:${API_PORT}`,
+        // Os links dos e-mails (confirmação, recuperação) voltam para esta porta; o Supabase local
+        // a aceita em `additional_redirect_urls`.
+        NEXT_PUBLIC_SITE_URL: `http://localhost:${PORT}`,
       },
     },
   ],

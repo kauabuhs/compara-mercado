@@ -20,11 +20,16 @@ export default async function ContributePage() {
         <EmptyState
           icon={<Camera aria-hidden className="size-8" />}
           title="Entre para enviar preços"
-          description="Consultar e comparar não exige conta. Para fotografar etiquetas, entre com o seu e-mail: sem senha, mandamos um link."
+          description="Consultar e comparar não exige conta. Para fotografar etiquetas, entre ou crie a sua conta."
           action={
-            <Button asChild>
-              <Link href="/conta">Entrar</Link>
-            </Button>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button asChild>
+                <Link href="/entrar?next=/contribuir">Entrar</Link>
+              </Button>
+              <Button asChild variant="secondary">
+                <Link href="/cadastro?next=/contribuir">Criar conta</Link>
+              </Button>
+            </div>
           }
         />
       </div>
@@ -37,7 +42,7 @@ export default async function ContributePage() {
     <div className="mx-auto w-full max-w-xl space-y-6">
       <PageHeader
         title="Contribuir"
-        description="Fotografe a etiqueta de preço no mercado. Um revisor confere a foto e o preço aparece para todos."
+        description="Fotografe a etiqueta de preço no mercado. Ele aparece na Comunidade como não confirmado e vira confirmado quando outras pessoas o confirmam ou a equipe o aprova."
       />
       <ContributeForm stores={stores.map((store) => ({ id: store.id, name: store.name }))} />
       <p className="text-center">

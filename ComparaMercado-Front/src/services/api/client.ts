@@ -27,7 +27,7 @@ export class ApiUnavailableError extends Error {
 export interface ApiRequestOptions<T> {
   /** Schema do contrato: a resposta é validada antes de chegar à interface. */
   schema: ZodType<T>;
-  method?: "GET" | "POST";
+  method?: "GET" | "POST" | "PATCH";
   query?: Record<string, string | number | undefined>;
   body?: unknown;
   /** Corpo multipart (upload de foto). O fetch define o Content-Type, com o boundary. */

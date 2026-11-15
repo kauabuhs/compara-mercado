@@ -8,6 +8,11 @@ const ADMIN_LINKS = [
   { href: "/admin", label: "Resumo" },
   { href: "/admin/precos", label: "Lançar preços" },
   { href: "/admin/revisao", label: "Fila de revisão" },
+  { href: "/admin/moderacao", label: "Moderação" },
+  { href: "/admin/produtos", label: "Produtos" },
+  { href: "/admin/mercados", label: "Mercados" },
+  { href: "/admin/cidades", label: "Cidades" },
+  { href: "/admin/categorias", label: "Categorias" },
 ] as const;
 
 /** Controle segmentado (estilo iOS) do painel interno; rola na horizontal em telas muito estreitas. */

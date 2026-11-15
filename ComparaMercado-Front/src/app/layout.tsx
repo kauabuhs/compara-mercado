@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { Nav } from "@/components/layout/nav";
 import { SwRegister } from "@/components/shared/sw-register";
+import { ListSync } from "@/modules/shopping-list/components/list-sync";
 import "@/styles/globals.css";
 
 export const metadata: Metadata = {
@@ -52,6 +53,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           </main>
         </div>
         <SwRegister />
+        <ListSync />
       </body>
     </html>
   );

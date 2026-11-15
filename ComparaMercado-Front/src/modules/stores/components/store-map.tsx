@@ -1,6 +1,6 @@
 "use client";
 
-import { Maximize, Minus, Plus } from "lucide-react";
+import { Focus, Maximize, Minimize, Minus, Plus } from "lucide-react";
 import {
   AttributionControl,
   LngLatBounds,
@@ -91,6 +91,13 @@ function createUserDot(): HTMLDivElement {
   return dot;
 }
 
+/**
+ * Aparelho só de toque (celular, tablet): sem mouse nem trackpad. Decide pelo que o aparelho TEM,
+ * não pelo ponteiro principal: um notebook com tela sensível ao toque também reporta ponteiro
+ * "coarse", mas tem mouse, e nele o mapa precisa de roda do mouse e botões de zoom.
+ */
+const TOUCH_ONLY_QUERY = "(pointer: coarse) and (not (any-pointer: fine))";
+
 const NEARBY_KM = 100;
 
 function distanceKm(a: MapPoint, b: MapPoint): number {
@@ -125,13 +132,24 @@ interface StoreMapProps {
   selectedId: string | null;
   onSelect: (storeId: string | null) => void;
   userLocation: MapPoint | null;
+  /** Mapa em tela cheia (o pai cuida de ocupar a janela; aqui só ajustamos gestos e botão). */
+  expanded: boolean;
+  onToggleExpanded: () => void;
   className?: string;
 }
 
 type MapStatus = "loading" | "ready" | "error";
 
 /** Mapa dos mercados: pinos, seleção sincronizada com a lista e a posição do usuário (opcional). */
-export function StoreMap({ stores, selectedId, onSelect, userLocation, className }: StoreMapProps) {
+export function StoreMap({
+  stores,
+  selectedId,
+  onSelect,
+  userLocation,
+  expanded,
+  onToggleExpanded,
+  className,
+}: StoreMapProps) {
   const containerRef = useRef<HTMLElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const pinsRef = useRef(new Map<string, { marker: Marker; button: HTMLButtonElement }>());
@@ -177,7 +195,7 @@ export function StoreMap({ stores, selectedId, onSelect, userLocation, className
     const container = containerRef.current;
     if (!container) return;
 
-    const hasTouchScreen = window.matchMedia("(pointer: coarse)").matches;
+    const hasTouchScreen = window.matchMedia(TOUCH_ONLY_QUERY).matches;
     const firstStore = storesRef.current[0];
     const map = new MapLibreMap({
       container,
@@ -193,13 +211,17 @@ export function StoreMap({ stores, selectedId, onSelect, userLocation, className
       locale: COOPERATIVE_GESTURE_HINTS,
     });
     map.touchZoomRotate.disableRotation();
-    map.addControl(new AttributionControl({ compact: true }), "top-left");
+    map.addControl(new AttributionControl({ compact: true }), "bottom-left");
+    // Créditos começam recolhidos (só o "i"); abrem ao tocar. Recolhe já na criação (não espera os
+    // tiles, que podem demorar) e de novo no `load`, quando o MapLibre costuma reabri-los.
+    const collapseCredits = () => {
+      const credits = container.querySelector(".maplibregl-ctrl-attrib");
+      credits?.classList.remove("maplibregl-compact-show");
+      credits?.removeAttribute("open");
+    };
+    collapseCredits();
     map.on("load", () => {
-      // Créditos começam recolhidos (só o "i"); abrem ao tocar.
-      container
-        .querySelector(".maplibregl-ctrl-attrib")
-        ?.classList.remove("maplibregl-compact-show");
-      container.querySelector(".maplibregl-ctrl-attrib")?.removeAttribute("open");
+      collapseCredits();
       hasLoadedRef.current = true;
       setStatus("ready");
     });
@@ -285,8 +307,25 @@ export function StoreMap({ stores, selectedId, onSelect, userLocation, className
     fitToContent(true);
   }, [userLocation]);
 
+  // Em tela cheia não há página para rolar: no toque, um dedo basta para mover o mapa. Fora dela,
+  // volta a exigir dois dedos (o mapa não pode "prender" a rolagem da página no celular).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !window.matchMedia(TOUCH_ONLY_QUERY).matches) return;
+    if (expanded) map.cooperativeGestures.disable();
+    else map.cooperativeGestures.enable();
+  }, [expanded]);
+
+  // O contêiner muda de tamanho ao entrar/sair da tela cheia; o MapLibre já observa o tamanho,
+  // este resize só garante o desenho certo logo depois da transição.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `expanded` é o gatilho (refaz o resize a cada troca), mesmo sem ser lido
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => mapRef.current?.resize());
+    return () => cancelAnimationFrame(frame);
+  }, [expanded]);
+
   const controlClass =
-    "flex size-11 items-center justify-center rounded-full transition-colors hover:bg-fill active:bg-fill-strong";
+    "flex size-10 items-center justify-center rounded-full transition-colors hover:bg-fill active:bg-fill-strong";
 
   return (
     <div className={cn("relative overflow-hidden rounded-3xl bg-fill", className)}>
@@ -308,11 +347,25 @@ export function StoreMap({ stores, selectedId, onSelect, userLocation, className
         </p>
       ) : null}
 
-      <div className="glass-float absolute top-3 right-3 z-10 flex flex-col rounded-full p-1">
+      {/* Um só bloco de vidro, discreto. Em aparelho só de toque o zoom é por pinça (como em
+          qualquer mapa do celular), então + e − só aparecem quando há mouse ou trackpad. */}
+      <div className="glass-float absolute top-[max(0.75rem,env(safe-area-inset-top))] right-[max(0.75rem,env(safe-area-inset-right))] z-10 flex flex-col rounded-full p-0.5">
+        <button
+          type="button"
+          aria-label={expanded ? "Sair da tela cheia" : "Tela cheia"}
+          className={controlClass}
+          onClick={onToggleExpanded}
+        >
+          {expanded ? (
+            <Minimize aria-hidden className="size-4" />
+          ) : (
+            <Maximize aria-hidden className="size-4" />
+          )}
+        </button>
         <button
           type="button"
           aria-label="Aproximar"
-          className={controlClass}
+          className={cn(controlClass, "hidden [@media(any-pointer:fine)]:flex")}
           onClick={() => mapRef.current?.zoomIn()}
         >
           <Plus aria-hidden className="size-5" />
@@ -320,7 +373,7 @@ export function StoreMap({ stores, selectedId, onSelect, userLocation, className
         <button
           type="button"
           aria-label="Afastar"
-          className={controlClass}
+          className={cn(controlClass, "hidden [@media(any-pointer:fine)]:flex")}
           onClick={() => mapRef.current?.zoomOut()}
         >
           <Minus aria-hidden className="size-5" />
@@ -334,7 +387,7 @@ export function StoreMap({ stores, selectedId, onSelect, userLocation, className
             fitToContent(true);
           }}
         >
-          <Maximize aria-hidden className="size-4" />
+          <Focus aria-hidden className="size-4" />
         </button>
       </div>
     </div>

@@ -29,13 +29,73 @@ export function signInAsAdmin(): Promise<unknown> {
   });
 }
 
-/** Cria um usuário comum descartável (o Supabase local não exige confirmação de e-mail). */
-export function signUpNewUser(label: string): Promise<unknown> {
+// ── E-mails do Supabase local (Mailpit) ─────────────────────────────────────────────────────────
+// O cadastro exige confirmar o e-mail e a recuperação de senha chega por e-mail: os testes leem a
+// caixa do Mailpit local, como uma pessoa leria a dela.
+const MAILPIT_URL = process.env["E2E_MAILPIT_URL"] ?? "http://127.0.0.1:54324";
+
+interface MailpitMessage {
+  ID: string;
+  Subject: string;
+}
+
+/** Primeiro link (`href`) do HTML do e-mail, já sem o escape de `&amp;`. */
+function firstLink(html: string): string {
+  const href = /href="([^"]+)"/.exec(html)?.[1];
+  if (!href) throw new Error("o e-mail não tem nenhum link");
+  return href.replaceAll("&amp;", "&");
+}
+
+/** Espera chegar um e-mail para `to` cujo assunto contém `subject` e devolve o link dele. */
+export async function waitForEmailLink(to: string, subject: string): Promise<string> {
+  const deadline = Date.now() + 20_000;
+  while (Date.now() < deadline) {
+    const search = await fetch(
+      `${MAILPIT_URL}/api/v1/search?query=${encodeURIComponent(`to:${to}`)}`,
+    );
+    if (search.ok) {
+      const { messages } = (await search.json()) as { messages: MailpitMessage[] };
+      // O mais recente primeiro: a caixa é compartilhada entre execuções.
+      const match = messages.find((message) => message.Subject.includes(subject));
+      if (match) {
+        const full = (await (await fetch(`${MAILPIT_URL}/api/v1/message/${match.ID}`)).json()) as {
+          HTML: string;
+        };
+        return firstLink(full.HTML);
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error(`nenhum e-mail "${subject}" chegou para ${to}`);
+}
+
+/** Dados de um usuário comum descartável (a senha atende à política do Supabase local). */
+export function newTestCredentials(label: string) {
   const unique = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
-  return authRequest("signup", {
-    email: `e2e-${label}-${unique}@test.local`,
-    password: `Senha-${unique}-Forte!`,
+  return { email: `e2e-${label}-${unique}@test.local`, password: `Senha-${unique}-Forte!` };
+}
+
+/**
+ * Cria um usuário comum descartável e o deixa pronto para uso: cadastra, confirma o e-mail pelo
+ * link recebido (como uma pessoa faria) e devolve a sessão.
+ */
+export async function signUpNewUser(label: string): Promise<unknown> {
+  const { email, password } = newTestCredentials(label);
+  await authRequest("signup", { email, password });
+  const confirmLink = await waitForEmailLink(email, "Confirme seu e-mail");
+  // O GET no link confirma o e-mail; o redirecionamento seguinte (para o site) não interessa.
+  await fetch(confirmLink, { redirect: "manual" });
+  return authRequest("token?grant_type=password", { email, password });
+}
+
+/** Mesmo que `signUpNewUser`, mas devolve também as credenciais (para entrar pela interface). */
+export async function createConfirmedUser(label: string) {
+  const credentials = newTestCredentials(label);
+  await authRequest("signup", credentials);
+  await fetch(await waitForEmailLink(credentials.email, "Confirme seu e-mail"), {
+    redirect: "manual",
   });
+  return credentials;
 }
 
 /** Cookies de sessão no formato do @supabase/ssr: valor base64url dividido em pedaços. */

@@ -78,12 +78,15 @@ export function SegmentedControl<T extends string>({
   options,
   onChange,
   className,
+  compact = false,
 }: {
   label: string;
   value: T;
   options: ReadonlyArray<SegmentOption<T>>;
   onChange: (value: T) => void;
   className?: string;
+  /** Só os ícones (o rótulo continua para leitores de tela): cabe num canto do cabeçalho. */
+  compact?: boolean;
 }) {
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
@@ -95,7 +98,6 @@ export function SegmentedControl<T extends string>({
   }
 
   return (
-    // biome-ignore lint/a11y/useSemanticElements: radiogroup visual customizado; cada opção é um botão com role=radio
     <div
       role="radiogroup"
       aria-label={label}
@@ -115,13 +117,14 @@ export function SegmentedControl<T extends string>({
             onClick={() => onChange(option.value)}
             className={cn(
               "flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full px-3 text-sm font-medium whitespace-nowrap transition-[background-color,color] duration-200",
+              compact && "size-11 flex-none px-0",
               active
                 ? "bg-surface text-foreground"
                 : "text-muted-foreground hover:bg-fill hover:text-foreground",
             )}
           >
             {option.icon}
-            {option.label}
+            <span className={compact ? "sr-only" : undefined}>{option.label}</span>
           </button>
         );
       })}

@@ -2,8 +2,8 @@
 
 import { Download, Share } from "lucide-react";
 import { useEffect, useState } from "react";
-import { RowContent, rowClass, Section } from "@/components/ui/controls";
-import { Group, GroupRow, IconTile } from "@/components/ui/primitives";
+import { RowContent, rowClass } from "@/components/ui/controls";
+import { GroupRow, IconTile } from "@/components/ui/primitives";
 
 // Evento não padronizado (Chromium): permite abrir o convite de instalação do app (PWA).
 interface InstallPromptEvent extends Event {
@@ -22,7 +22,7 @@ function isIosSafari(): boolean {
 }
 
 /**
- * Convite para instalar o app. Aparece só quando faz sentido: no Android/desktop quando o navegador
+ * Linha para instalar o app (vai dentro de um `Group`). Aparece só quando faz sentido: no Android/desktop quando o navegador
  * oferece a instalação; no iPhone/iPad com a instrução (lá é pelo menu Compartilhar). Já instalado: some.
  */
 export function InstallAppRow() {
@@ -47,43 +47,35 @@ export function InstallAppRow() {
 
   if (installEvent) {
     return (
-      <Section title="Aplicativo">
-        <Group>
-          <GroupRow>
-            <button
-              type="button"
-              onClick={() => {
-                void installEvent.prompt();
-                setInstallEvent(null);
-              }}
-              className={rowClass}
-            >
-              <RowContent
-                icon={<IconTile icon={Download} tone="info" />}
-                title="Instalar o app"
-                description="Abre direto da tela inicial, em tela cheia"
-                chevron
-              />
-            </button>
-          </GroupRow>
-        </Group>
-      </Section>
+      <GroupRow>
+        <button
+          type="button"
+          onClick={() => {
+            void installEvent.prompt();
+            setInstallEvent(null);
+          }}
+          className={rowClass}
+        >
+          <RowContent
+            icon={<IconTile icon={Download} tone="info" />}
+            title="Instalar o app"
+            description="Abre direto da tela inicial, em tela cheia"
+            chevron
+          />
+        </button>
+      </GroupRow>
     );
   }
 
   if (showIosHint) {
     return (
-      <Section title="Aplicativo">
-        <Group>
-          <GroupRow className="flex items-center gap-3 px-4 py-3">
-            <IconTile icon={Share} tone="info" />
-            <p className="type-caption">
-              Para instalar: toque em <strong className="text-foreground">Compartilhar</strong> e
-              depois em <strong className="text-foreground">Adicionar à Tela de Início</strong>.
-            </p>
-          </GroupRow>
-        </Group>
-      </Section>
+      <GroupRow className="flex items-center gap-3 px-4 py-3">
+        <IconTile icon={Share} tone="info" />
+        <p className="type-caption">
+          Para instalar: toque em <strong className="text-foreground">Compartilhar</strong> e depois
+          em <strong className="text-foreground">Adicionar à Tela de Início</strong>.
+        </p>
+      </GroupRow>
     );
   }
 

@@ -1,9 +1,12 @@
 /* Service worker mínimo e conservador.
  * - Páginas: rede primeiro; se offline, devolve a última cópia visitada (inclui /lista).
  * - Estáticos imutáveis do Next (/_next/static): cache primeiro.
- * - Nunca guarda respostas de API, ações de servidor nem de /admin e /auth (dados sensíveis).
+ * - Nunca guarda respostas de API, ações de servidor, telas de acesso, /comunidade (traz "é meu" e o
+ *   voto de quem está logado), /admin, /auth e /conta (dados sensíveis); nem respostas redirecionadas
+ *   (ex.: /entrar com sessão ativa redireciona para /conta: o HTML da conta não pode ficar sob a
+ *   chave de /entrar).
  * Mudou algo aqui? Incremente VERSION para limpar caches antigos. */
-const VERSION = "v1";
+const VERSION = "v2";
 const PAGES = `pages-${VERSION}`;
 const STATIC = `static-${VERSION}`;
 
@@ -20,7 +23,17 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-const NEVER_CACHE = [/^\/admin/, /^\/auth/, /^\/conta/, /^\/api/];
+const NEVER_CACHE = [
+  /^\/admin/,
+  /^\/auth/,
+  /^\/conta/,
+  /^\/api/,
+  /^\/entrar/,
+  /^\/cadastro/,
+  /^\/recuperar-senha/,
+  /^\/nova-senha/,
+  /^\/comunidade/,
+];
 
 self.addEventListener("fetch", (event) => {
   const req = event.request;
@@ -45,7 +58,7 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(req)
         .then((res) => {
-          if (res.ok) {
+          if (res.ok && !res.redirected) {
             const copy = res.clone();
             caches.open(PAGES).then((c) => c.put(req, copy));
           }

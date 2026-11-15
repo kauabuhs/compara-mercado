@@ -13,6 +13,7 @@ import { clampPage, LIST_PAGE_SIZE, totalPages } from "@/lib/pagination";
 import { searchItems } from "@/lib/search";
 import { cn } from "@/lib/utils";
 import type { MapStore } from "./store-map";
+import { useFullscreen } from "./use-fullscreen";
 
 const MAP_HEIGHT = "h-[22rem] md:h-[28rem] lg:h-[32rem]";
 
@@ -63,6 +64,7 @@ export function StoresView({ stores }: { stores: StoreRow[] }) {
   const [page, setPage] = useState(1);
   const mapWrapperRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const { expanded, fallback, toggle: toggleExpanded } = useFullscreen(mapWrapperRef);
 
   // Busca instantânea (sem acento, tolera erro de digitação) e, com a posição, do mais perto ao mais longe.
   const visibleStores = useMemo(() => {
@@ -96,8 +98,11 @@ export function StoresView({ stores }: { stores: StoreRow[] }) {
     // Um pino do mapa pode ser de outra página da lista: leva a lista até ele.
     const index = visibleStores.findIndex((store) => store.id === storeId);
     if (index >= 0) setPage(Math.floor(index / LIST_PAGE_SIZE) + 1);
-    // No celular a lista fica abaixo do mapa: traz o mapa para a tela ao escolher um mercado.
-    mapWrapperRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    // No celular a lista fica abaixo do mapa: traz o mapa para a tela ao escolher um mercado
+    // (em tela cheia o mapa já ocupa tudo).
+    if (!expanded) {
+      mapWrapperRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
   }
 
   function changePage(target: number) {
@@ -120,17 +125,28 @@ export function StoresView({ stores }: { stores: StoreRow[] }) {
 
   return (
     <div className="space-y-4">
-      <div ref={mapWrapperRef} className="relative scroll-mt-4">
+      <div
+        ref={mapWrapperRef}
+        className={cn(
+          "scroll-mt-4 [&:fullscreen]:bg-background",
+          // Sem a Fullscreen API (iPhone): o próprio wrapper cobre a janela, acima da navegação.
+          // `relative` e `fixed` são exclusivos: no CSS do Tailwind `relative` venceria `fixed`.
+          // `m-0`: o `space-y` do pai daria margem ao painel fixo e o encolheria.
+          fallback ? "fixed inset-0 z-50 m-0 bg-background" : "relative",
+        )}
+      >
         <StoreMap
           stores={visibleStores}
           selectedId={selectedId}
           onSelect={selectStore}
           userLocation={userLocation}
-          className={MAP_HEIGHT}
+          expanded={expanded}
+          onToggleExpanded={toggleExpanded}
+          className={expanded ? "h-full rounded-none" : MAP_HEIGHT}
         />
 
         {selectedStore ? (
-          <div className="glass-float absolute inset-x-3 bottom-3 z-10 animate-fade-in space-y-3 rounded-2xl p-3">
+          <div className="glass-float absolute inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-10 mx-auto max-w-xl animate-fade-in space-y-3 rounded-2xl p-3">
             <div className="flex items-center gap-3">
               <IconTile icon={Store} tone="brand" />
               <div className="min-w-0 flex-1">

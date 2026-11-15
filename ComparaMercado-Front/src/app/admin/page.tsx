@@ -1,4 +1,4 @@
-import { ClipboardCheck, type LucideIcon, Package, Store, Tag } from "lucide-react";
+import { ClipboardCheck, type LucideIcon, Package, ShieldAlert, Store, Tag } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Card, IconTile, PageHeader } from "@/components/ui/primitives";
@@ -51,10 +51,24 @@ export default async function AdminHome() {
       icon: ClipboardCheck,
       tone: "warning" as const,
     },
-    { label: "Mercados ativos", value: overview.activeStores, icon: Store, tone: "info" as const },
+    {
+      label: "Denúncias abertas",
+      value: overview.openModerationTasks,
+      href: "/admin/moderacao",
+      icon: ShieldAlert,
+      tone: "danger" as const,
+    },
+    {
+      label: "Mercados ativos",
+      value: overview.activeStores,
+      href: "/admin/mercados",
+      icon: Store,
+      tone: "info" as const,
+    },
     {
       label: "Produtos ativos",
       value: overview.activeProducts,
+      href: "/admin/produtos",
       icon: Package,
       tone: "brand" as const,
     },

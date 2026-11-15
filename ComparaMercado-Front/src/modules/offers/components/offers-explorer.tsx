@@ -16,7 +16,7 @@ import { type PickerStore, StorePicker } from "@/modules/offers/components/store
 
 const SORT_OPTIONS: ReadonlyArray<{ value: OffersSort; label: string }> = [
   { value: "featured", label: "Em destaque" },
-  { value: "price", label: "Menor preço" },
+  { value: "price", label: "Menor preço por kg/litro" },
   { value: "validity", label: "Vence primeiro" },
   { value: "recent", label: "Mais recentes" },
 ];

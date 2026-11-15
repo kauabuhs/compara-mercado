@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { ConfirmSubmitButton } from "@/components/shared/confirm-submit";
 import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/ui/pagination";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
@@ -7,6 +6,7 @@ import { formatBRL } from "@/lib/format";
 import { PAGE_PARAM, parsePage, totalPages } from "@/lib/pagination";
 import { withParams } from "@/lib/search-params";
 import { reviewObservation } from "@/modules/admin/actions";
+import { RejectForm } from "@/modules/admin/components/reject-form";
 import { getAccessToken } from "@/server/session";
 import { getReviewQueue } from "@/services/api/endpoints";
 
@@ -78,25 +78,17 @@ export default async function ReviewQueuePage({
                       {formatBRL(observation.priceCents)}
                     </p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <form action={reviewObservation.bind(null, observation.id, "approved")}>
                       <Button type="submit">Aprovar</Button>
                     </form>
-                    <form action={reviewObservation.bind(null, observation.id, "rejected")}>
-                      <ConfirmSubmitButton
-                        variant="secondary"
-                        className="text-danger"
-                        confirmation={{
-                          variant: "alert",
-                          title: `Rejeitar o preço de ${observation.productName}?`,
-                          description: "Ele não será publicado e sai da fila de revisão.",
-                          confirmLabel: "Rejeitar",
-                          destructive: true,
-                        }}
-                      >
-                        Rejeitar
-                      </ConfirmSubmitButton>
-                    </form>
+                    <RejectForm
+                      idPrefix={observation.id}
+                      action={reviewObservation.bind(null, observation.id, "rejected")}
+                      title={`Rejeitar o preço de ${observation.productName}?`}
+                      description="Ele não será publicado e sai da fila de revisão. Quem enviou vê o motivo escolhido."
+                      confirmLabel="Rejeitar"
+                    />
                   </div>
                 </Card>
               </li>

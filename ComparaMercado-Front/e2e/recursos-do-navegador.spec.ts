@@ -40,7 +40,7 @@ test.describe("mapa", () => {
 
     await page.goto("/mercados");
     await expect(page.locator(".maplibregl-canvas")).toBeVisible();
-    const storeRows = page.locator("main ul li");
+    const storeRows = page.locator("main ul li:visible");
     await expect(storeRows.first()).toBeVisible();
     const storeCount = await storeRows.count();
     expect(storeCount).toBeGreaterThanOrEqual(6);
@@ -48,6 +48,111 @@ test.describe("mapa", () => {
     await expect.poll(() => workerResponses.length, { timeout: 10_000 }).toBeGreaterThan(0);
     expect(workerResponses.every((status) => status === 200)).toBe(true);
     expect(problems).toEqual([]);
+  });
+});
+
+test.describe("mapa: uso com mouse (desktop)", () => {
+  test.beforeEach(({ isMobile }) => {
+    test.skip(isMobile, "No celular o mapa é por toque (sem mouse nem botões de zoom).");
+  });
+
+  /** Distância entre os dois primeiros pinos: cresce ao aproximar, encolhe ao afastar. */
+  async function pinSpacing(page: Page) {
+    const [first, second] = await page.locator(".maplibregl-marker").all();
+    const a = await first?.boundingBox();
+    const b = await second?.boundingBox();
+    return Math.hypot((a?.x ?? 0) - (b?.x ?? 0), (a?.y ?? 0) - (b?.y ?? 0));
+  }
+
+  async function openMap(page: Page) {
+    await page.goto("/mercados");
+    await expect(page.locator(".maplibregl-marker").first()).toBeVisible();
+    // espera o mapa ficar pronto (a camada de carregamento some quando o estilo chega)
+    await expect(page.locator(".animate-pulse.absolute")).toHaveCount(0, { timeout: 20_000 });
+  }
+
+  test("tem botões de zoom e eles funcionam com o mouse", async ({ page }) => {
+    await openMap(page);
+    const before = await pinSpacing(page);
+    await page.getByRole("button", { name: "Aproximar" }).click();
+    await expect.poll(() => pinSpacing(page)).toBeGreaterThan(before);
+    await page.getByRole("button", { name: "Afastar" }).click();
+    await page.getByRole("button", { name: "Afastar" }).click();
+    await expect.poll(() => pinSpacing(page)).toBeLessThan(before);
+  });
+
+  test("a roda do mouse aproxima e arrastar move o mapa (sem exigir Ctrl)", async ({ page }) => {
+    await openMap(page);
+    const map = page.getByLabel("Mapa dos mercados");
+    const box = await map.boundingBox();
+    const center = {
+      x: (box?.x ?? 0) + (box?.width ?? 0) / 2,
+      y: (box?.y ?? 0) + (box?.height ?? 0) / 2,
+    };
+    // Ponto de arrasto fora dos pinos e dos controles (um pino no meio "roubaria" o clique).
+    const empty = {
+      x: (box?.x ?? 0) + (box?.width ?? 0) * 0.08,
+      y: (box?.y ?? 0) + (box?.height ?? 0) * 0.5,
+    };
+
+    const spacing = await pinSpacing(page);
+    await page.mouse.move(center.x, center.y);
+    await page.mouse.wheel(0, -400);
+    await expect.poll(() => pinSpacing(page)).toBeGreaterThan(spacing);
+
+    const pin = page.locator(".maplibregl-marker").first();
+    const pinBefore = await pin.boundingBox();
+    await page.mouse.move(empty.x, empty.y);
+    await page.mouse.down();
+    await page.mouse.move(empty.x + 120, empty.y + 60, { steps: 8 });
+    await page.mouse.up();
+    await expect
+      .poll(async () => ((await pin.boundingBox())?.x ?? 0) - (pinBefore?.x ?? 0))
+      .toBeGreaterThan(60);
+  });
+});
+
+test.describe("mapa: tela cheia", () => {
+  test("entra em tela cheia e sai pelo botão", async ({ page }) => {
+    // Pela API nativa onde o navegador deixa; senão, pelo modo alternativo (o headless recusa a
+    // API). Nos dois o mapa passa a cobrir a janela e o botão troca de rótulo.
+    await page.goto("/mercados");
+    await page.getByRole("button", { name: "Tela cheia" }).click();
+    await expect(page.getByRole("button", { name: "Sair da tela cheia" })).toBeVisible();
+    await expect
+      .poll(async () => (await page.getByLabel("Mapa dos mercados").boundingBox())?.width)
+      .toBe(page.viewportSize()?.width);
+
+    await page.getByRole("button", { name: "Sair da tela cheia" }).click();
+    await expect(page.getByRole("button", { name: "Tela cheia" })).toBeVisible();
+    // sair da tela cheia nativa leva um instante
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement === null)).toBe(true);
+  });
+
+  test("sem a Fullscreen API (iPhone) o mapa cobre a janela e o Esc sai", async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(document, "fullscreenEnabled", { value: false });
+    });
+    await page.goto("/mercados");
+    await page.getByRole("button", { name: "Tela cheia" }).click();
+    await expect(page.getByRole("button", { name: "Sair da tela cheia" })).toBeVisible();
+
+    const viewport = page.viewportSize();
+    const box = await page.getByLabel("Mapa dos mercados").boundingBox();
+    expect(Math.round(box?.width ?? 0)).toBe(viewport?.width);
+    expect(Math.round(box?.height ?? 0)).toBe(viewport?.height);
+    // a página de trás não rola enquanto o mapa cobre a janela
+    expect(await page.evaluate(() => document.body.style.overflow)).toBe("hidden");
+
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("button", { name: "Tela cheia" })).toBeVisible();
+    expect(await page.evaluate(() => document.body.style.overflow)).toBe("");
+  });
+
+  test("'Mostrar todos os mercados' continua à mão, separado da tela cheia", async ({ page }) => {
+    await page.goto("/mercados");
+    await expect(page.getByRole("button", { name: "Mostrar todos os mercados" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Tela cheia" })).toBeVisible();
   });
 });
 
@@ -74,8 +179,8 @@ test.describe("geolocalização", () => {
     await page.goto("/mercados");
     await page.getByRole("button", { name: "Ordenar por distância" }).click();
     await expect(page.getByRole("status")).toContainText("Não conseguimos sua localização");
-    await expect(page.locator("main ul li").first()).toBeVisible();
-    expect(await page.locator("main ul li").count()).toBeGreaterThanOrEqual(6);
+    await expect(page.locator("main ul li:visible").first()).toBeVisible();
+    expect(await page.locator("main ul li:visible").count()).toBeGreaterThanOrEqual(6);
   });
 
   test("na lista: 'Considerar distância' mantém o total e não guarda a posição", async ({
@@ -166,6 +271,9 @@ test.describe("PWA e offline", () => {
   test("não guarda páginas sensíveis nem respostas de API nos caches", async ({ page }) => {
     await page.goto("/conta");
     await page.goto("/admin"); // redireciona para /conta para visitante
+    await page.goto("/entrar");
+    await page.goto("/cadastro");
+    await page.goto("/comunidade");
     await page.goto("/lista");
     await page.evaluate(() => navigator.serviceWorker.ready.then(() => true));
     await page.reload();
@@ -179,7 +287,13 @@ test.describe("PWA e offline", () => {
       }
       return paths;
     });
-    expect(cachedPaths.some((path) => /^\/(admin|auth|conta|api)/.test(path))).toBe(false);
+    expect(
+      cachedPaths.some((path) =>
+        /^\/(admin|auth|conta|api|entrar|cadastro|recuperar-senha|nova-senha|comunidade)/.test(
+          path,
+        ),
+      ),
+    ).toBe(false);
     expect(cachedPaths).toContain("/lista");
   });
 
@@ -221,7 +335,7 @@ test.describe("PWA e offline", () => {
 });
 
 test.describe("telas pequenas", () => {
-  const pages = ["/", "/busca?q=leite", "/ofertas", "/lista", "/mercados", "/conta"];
+  const pages = ["/", "/busca?q=leite", "/ofertas", "/comunidade", "/lista", "/mercados", "/conta"];
   for (const width of [320, 360, 390, 430]) {
     test(`sem rolagem horizontal em ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 800 });
@@ -254,17 +368,20 @@ test.describe("telas pequenas", () => {
       await page.goto(path);
       // Sem isto o mapa pode ainda não ter montado e o teste passaria por sorte.
       if (path === "/mercados")
-        await expect(page.getByRole("button", { name: "Aproximar" })).toBeVisible();
+        await expect(page.getByRole("button", { name: "Tela cheia" })).toBeVisible();
       await page.waitForTimeout(500);
       const small = await page.evaluate(() =>
         [...document.querySelectorAll<HTMLElement>("main a, main button, nav a, main input")]
           .filter((element) => {
+            // Créditos do mapa (OpenStreetMap, OpenFreeMap…): atribuição exigida pela licença, de
+            // terceiros e pequena por design; não é um controle do app.
+            if (element.closest(".maplibregl-ctrl-attrib")) return false;
             const box = element.getBoundingClientRect();
             return box.width > 1 && box.height > 1 && box.height < 40;
           })
           .map(
             (element) =>
-              `${(element.innerText || element.getAttribute("aria-label") || element.tagName).slice(0, 24)} ${Math.round(element.getBoundingClientRect().height)}px`,
+              `${(element.textContent?.trim() || element.getAttribute("aria-label") || element.tagName).slice(0, 24)} ${Math.round(element.getBoundingClientRect().height)}px`,
           ),
       );
       tooSmall.push(...small.map((entry) => `${path}: ${entry}`));

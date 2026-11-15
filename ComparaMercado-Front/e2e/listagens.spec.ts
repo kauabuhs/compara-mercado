@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { hasLocalSupabase, sessionCookies, signUpNewUser } from "./support/session";
 
 // Busca e filtros das listagens, mapa interativo e a página de conta. WebGL por software para o mapa.
 test.use({
@@ -58,10 +59,12 @@ test.describe("ofertas: busca, filtros e paginação", () => {
 
     await page.getByLabel("Ordenar por").selectOption("price");
     await expect(page).toHaveURL(/[?&]ordem=price/);
+    // "Menor preço" ordena pelo preço por kg/litro/unidade (comparável entre tamanhos), que é o
+    // segundo valor do cartão ("R$ 8,13 / kg"), não o preço da embalagem.
     const prices = await cards.evaluateAll((links) =>
       links.map((link) => {
         const text = link.textContent ?? "";
-        const match = text.match(/R\$\s?(\d+),(\d{2})/);
+        const match = text.match(/R\$\s?(\d+),(\d{2})\s*\/\s*(?:kg|l|un)/);
         return match ? Number(match[1]) * 100 + Number(match[2]) : Number.NaN;
       }),
     );
@@ -118,7 +121,7 @@ test.describe("mercados: mapa e lista sincronizados", () => {
     page,
   }) => {
     await page.goto("/mercados");
-    const rows = page.locator("main ul li");
+    const rows = page.locator("main ul li:visible");
     await expect(rows.first()).toBeVisible();
     const storeCount = await rows.count();
     expect(storeCount).toBeGreaterThanOrEqual(6);
@@ -148,7 +151,7 @@ test.describe("mercados: mapa e lista sincronizados", () => {
   test("clicar no pino seleciona o mercado na lista", async ({ page }) => {
     await page.goto("/mercados");
     await page.locator(".store-pin").first().click();
-    await expect(page.locator("main ul li button[aria-pressed='true']")).toHaveCount(1);
+    await expect(page.locator("main ul li:visible button[aria-pressed='true']")).toHaveCount(1);
     await expect(page.getByRole("link", { name: "Como chegar" })).toBeVisible();
   });
 });
@@ -158,20 +161,54 @@ test.describe("conta", () => {
     await page.goto("/conta");
     await expect(page.getByRole("heading", { name: "Conta", level: 1 })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Entre para contribuir" })).toBeVisible();
-    await expect(page.getByLabel("Seu e-mail")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Entrar", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Criar conta" })).toBeVisible();
     await expect(page.getByRole("link", { name: /Minha lista de compras/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Sua localização/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Privacidade e dados/ })).toBeVisible();
+    // a aparência é um controle compacto no cabeçalho, sempre à mão
+    await expect(page.getByRole("radiogroup", { name: "Aparência" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Termos de Uso" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Política de Privacidade" })).toBeVisible();
     // visitante não vê ações de conta
     await expect(page.getByRole("button", { name: "Sair da conta" })).toHaveCount(0);
     await expect(page.getByText("Excluir minha conta")).toHaveCount(0);
   });
 
+  test("logado: o resumo leva ao perfil e a tela tem poucas peças", async ({
+    browser,
+    baseURL,
+  }) => {
+    test.skip(!hasLocalSupabase, "exige o Supabase local");
+    const origin = baseURL ?? "http://localhost:3100";
+    const context = await browser.newContext({ baseURL: origin });
+    await context.addCookies(sessionCookies(await signUpNewUser("conta"), origin));
+    const page = await context.newPage();
+
+    await page.goto("/conta");
+    // poucas peças, sem títulos de seção: resumo, atividade, app e privacidade, sair
+    await expect(page.getByRole("heading", { name: "Entre para contribuir" })).toHaveCount(0);
+    await expect(page.locator("main section > h2")).toHaveCount(0);
+    await expect(page.getByRole("radiogroup", { name: "Aparência" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Privacidade e dados/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Meus envios/ })).toBeVisible();
+    // ação destrutiva isolada: sair pede confirmação e dá para cancelar
+    await page.getByRole("button", { name: "Sair da conta" }).click();
+    await expect(page.getByRole("dialog", { name: "Sair da conta?" })).toBeVisible();
+    await page.getByRole("button", { name: "Cancelar" }).click();
+    await expect(page.getByRole("dialog", { name: "Sair da conta?" })).toBeHidden();
+
+    // o cartão do topo é o caminho para o perfil
+    await page.getByRole("link", { name: /Abrir meu perfil/ }).click();
+    await expect(page).toHaveURL(/\/conta\/perfil$/);
+    await context.close();
+  });
+
   test("detalhes de privacidade abrem num sheet com o texto completo e fecham de 3 jeitos", async ({
     page,
-  }) => {
+  }, testInfo) => {
     await page.goto("/conta");
-    const sheet = page.getByRole("dialog", { name: "Sua localização" });
-    const open = page.getByRole("button", { name: /Sua localização/ });
+    const sheet = page.getByRole("dialog", { name: "Privacidade e dados" });
+    const open = page.getByRole("button", { name: /Privacidade e dados/ });
 
     await open.click();
     await expect(sheet).toBeVisible();
@@ -179,11 +216,20 @@ test.describe("conta", () => {
     await expect(sheet).toContainText("nunca é gravada");
     await expect(sheet).toContainText("No mapa:");
 
-    // o sheet nasce colado na borda de baixo da tela
+    // no celular o sheet nasce colado na borda de baixo; no desktop abre centralizado.
+    // Mede só depois da animação de entrada (sobe da base / zoom), senão pega o meio do caminho.
+    await expect
+      .poll(async () => sheet.evaluate((el) => getComputedStyle(el).transform))
+      .toBe("none");
     const box = await sheet.boundingBox();
     const viewport = page.viewportSize();
     expect(box).not.toBeNull();
-    expect(Math.abs((box?.y ?? 0) + (box?.height ?? 0) - (viewport?.height ?? 0))).toBeLessThan(2);
+    const gapBottom = (viewport?.height ?? 0) - ((box?.y ?? 0) + (box?.height ?? 0));
+    if (testInfo.project.name === "mobile") {
+      expect(Math.abs(gapBottom)).toBeLessThan(2);
+    } else {
+      expect(Math.abs((box?.y ?? 0) - gapBottom)).toBeLessThan(2);
+    }
 
     await page.keyboard.press("Escape");
     await expect(sheet).toBeHidden();
@@ -212,7 +258,7 @@ test.describe("conta", () => {
     await expect(page.locator("html")).not.toHaveAttribute("data-theme", /.+/);
   });
 
-  test("a lista salva aparece na conta e pode ser limpa com confirmação", async ({ page }) => {
+  test("a lista salva aparece na conta com a contagem de itens", async ({ page }) => {
     await page.goto("/busca?q=arroz");
     await page
       .getByRole("list", { name: /Resultados/ })
@@ -226,10 +272,5 @@ test.describe("conta", () => {
     await expect(page.getByRole("link", { name: /Minha lista de compras/ })).toContainText(
       "1 item",
     );
-    await page.getByRole("button", { name: "Limpar lista salva" }).click();
-    const sheet = page.getByRole("dialog", { name: /Limpar a lista inteira/ });
-    await expect(sheet).toBeVisible();
-    await sheet.getByRole("button", { name: "Limpar lista" }).click();
-    await expect(page.getByRole("link", { name: /Minha lista de compras/ })).toContainText("vazia");
   });
 });

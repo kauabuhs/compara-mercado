@@ -13,18 +13,15 @@
   }
 }
 
-/* Créditos exigidos pela licença dos dados: botão "ⓘ" redondo, no mesmo vidro do resto da interface.
+/* Créditos exigidos pela licença dos dados: botão "ⓘ" redondo, no mesmo vidro dos controles de zoom.
    O MapLibre dá ao contêiner `padding: 2px 24px 2px 0` e ao botão 24 px com fundo próprio; ao
    aumentar só o botão ele vazava do contêiner (uma bolha cinza cortada). Aqui o contêiner FECHADO
    tem exatamente o tamanho do botão e quem desenha o círculo é ele; ABERTO, vira uma cápsula com
-   o texto e o botão continua fixo no canto, sem mudar de tamanho. */
+   o texto e o botão continua fixo no canto, sem mudar de tamanho. O ícone padrão do MapLibre (logo
+   + "i" em SVG preto) é trocado pelo "Info" do Lucide, desenhado com máscara e `currentColor`:
+   segue o tema sem filtro de inversão. */
 .map-canvas {
-  --attrib-size: 2rem;
-}
-@media (pointer: coarse) {
-  .map-canvas {
-    --attrib-size: 2.75rem; /* alvo de toque de 44 px */
-  }
+  --attrib-size: 2.5rem; /* mesmo tamanho dos botões dos controles (40 px) */
 }
 .map-canvas .maplibregl-ctrl-attrib.maplibregl-compact {
   box-sizing: border-box;
@@ -33,7 +30,7 @@
   border-radius: calc(var(--attrib-size) / 2);
   background-color: var(--glass-strong);
   color: var(--foreground);
-  box-shadow: var(--glass-edge);
+  box-shadow: var(--glass-edge), var(--glass-float);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   font-size: 0.75rem;
@@ -63,23 +60,29 @@
   height: var(--attrib-size);
   border-radius: 9999px;
   background-color: transparent;
-  background-position: center;
-  background-size: 1.375rem;
+  background-image: none;
+  color: var(--foreground);
+}
+.map-canvas .maplibregl-ctrl-attrib-button::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 1.25rem;
+  height: 1.25rem;
+  background-color: currentColor;
+  -webkit-mask: var(--attrib-icon) center / contain no-repeat;
+  mask: var(--attrib-icon) center / contain no-repeat;
+}
+.map-canvas {
+  /* Lucide "info" */
+  --attrib-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 16v-4'/%3E%3Cpath d='M12 8h.01'/%3E%3C/svg%3E");
 }
 .map-canvas .maplibregl-ctrl-attrib-button:hover {
   background-color: var(--fill);
 }
 .map-canvas .maplibregl-ctrl-attrib-button:focus-visible {
   box-shadow: 0 0 0 2px var(--ring);
-}
-/* O ícone do MapLibre é um SVG preto: no tema escuro, é invertido para continuar visível. */
-:root[data-theme="dark"] .map-canvas .maplibregl-ctrl-attrib-button {
-  filter: invert(1);
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .map-canvas .maplibregl-ctrl-attrib-button {
-    filter: invert(1);
-  }
 }
 
 /* Pino de mercado: alvo de toque de 44 px; a escala fica no corpo (o MapLibre move o botão). */

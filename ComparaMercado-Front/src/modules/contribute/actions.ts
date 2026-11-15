@@ -83,7 +83,7 @@ export async function submitContributionAction(
   return {
     ok: true,
     message:
-      "Enviado! Um revisor confere a foto e o preço aparece para todos assim que for aprovado.",
+      "Enviado! Seu preço já aparece na Comunidade como não confirmado e vira confirmado quando outras pessoas o confirmarem ou a equipe o aprovar.",
   };
 }
 

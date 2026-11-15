@@ -290,7 +290,8 @@ function ContributeFormFields({
         checked={consent}
         onChange={(event) => setConsent(event.target.checked)}
       >
-        A foto mostra só a etiqueta (sem pessoas) e autorizo usá-la para conferir o preço.
+        A foto mostra só a etiqueta (sem pessoas) e aceito que ela e o preço apareçam para outras
+        pessoas da minha cidade na Comunidade.
       </Switch>
 
       <Button

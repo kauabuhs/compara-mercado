@@ -366,8 +366,26 @@
     margin: auto auto 0 auto;
     overflow: visible;
   }
-  @media (prefers-reduced-motion: reduce) {
+
+  /* Desktop (mesmo breakpoint em que a navegação vira sidebar): os dois estilos de sheet deixam de
+     ser ancorados embaixo e abrem centralizados na tela, com a animação de zoom do alerta. */
+  @media (min-width: 64rem) {
+    .dialog-detail,
+    .dialog-sheet {
+      --dialog-from: scale(1.06);
+      --dialog-to: scale(0.96);
+      margin: auto;
+    }
     .dialog-detail {
+      width: min(calc(100% - 3rem), 34rem);
+    }
+    .dialog-sheet {
+      width: min(calc(100% - 3rem), 26rem);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dialog-detail,
+    .dialog-sheet {
       --dialog-from: none;
       --dialog-to: none;
     }
