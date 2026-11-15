@@ -18,13 +18,13 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^1.4.0",
+    "@anthropic-ai/sdk": "^1.6.0",
     "@hono/node-server": "^2.1.6",
-    "@supabase/supabase-js": "^2.118.0",
+    "@supabase/supabase-js": "^2.119.0",
     "drizzle-orm": "0.45.4",
-    "hono": "^4.13.16",
+    "hono": "^4.13.17",
     "pg": "8.23.1",
-    "pg-boss": "^12.38.0",
+    "pg-boss": "^12.38.1",
     "pino": "^10.4.0",
     "zod": "^4.6.7"
   },
