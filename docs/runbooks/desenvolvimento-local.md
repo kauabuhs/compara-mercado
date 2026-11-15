@@ -49,9 +49,13 @@ O worker lê o mesmo `ComparaMercado-Back/.env`: acrescente `DATABASE_URL` (`DB_
 | e2e: "Não foi possível comparar agora" em testes da lista  | a API limita a comparação a 30 req/min por IP e a suíte inteira passa disso | rode por projeto (`--project=desktop`) ou rode o arquivo isolado (`playwright test e2e/recursos-do-navegador.spec.ts`)      |
 | Porta ocupada no e2e (3100/4100)                           | servidor de teste de uma execução anterior                                  | encerre o processo que segura a porta e rode de novo                                                                        |
 
-## Login local (link mágico)
+## Login local (e-mail e senha)
 
-O login é por e-mail sem senha. Localmente os e-mails caem no **Mailpit**: http://127.0.0.1:54324 (sobe junto com `pnpm db:start`; se você usou `-x inbucket`, o login não completa). Entre com `admin@local.test`, abra o e-mail e clique no link: ele volta para `http://localhost:3000/auth/callback`. Isso depende de `site_url` e `additional_redirect_urls` em `ComparaMercado-Back/supabase/config.toml` apontarem para `localhost:3000`; depois de mudá-los, reinicie o Supabase (`db:stop` + `db:start`). Acesse sempre por `localhost`, não `127.0.0.1`: o cookie do PKCE é por host.
+Entre em http://localhost:3000/entrar. O admin do seed (só no local) é `admin@local.test` / `admin123456`: depois de entrar, **Conta → Painel interno** abre o `/admin`. Para testar como usuário comum, crie uma conta em `/cadastro`.
+
+Cadastro (confirmação de e-mail), "esqueci a senha" e link de acesso mandam e-mails que caem no **Mailpit**: http://127.0.0.1:54324 (sobe junto com `pnpm db:start`; se você usou `-x inbucket`, nada disso completa). Clique no link do e-mail: ele volta para `http://localhost:3000/auth/callback`. Isso depende de `site_url` e `additional_redirect_urls` em `ComparaMercado-Back/supabase/config.toml` (inclui `localhost:3100`, usado pelo e2e); depois de mudá-los ou de mexer em `[auth]`/templates, reinicie o Supabase (`db:stop` + `db:start`). Acesse sempre por `localhost`, não `127.0.0.1`: o cookie do PKCE é por host, e o link do e-mail precisa ser aberto no **mesmo navegador** que o pediu.
+
+Regras locais (espelham produção): e-mail confirmado obrigatório; senha com 10+ caracteres, maiúscula, minúscula e número; limite de 30 e-mails por hora. Como promover alguém a admin: [promover-admin](promover-admin.md). Como configurar o Auth em produção: [auth-producao](auth-producao.md).
 
 ## Dados de teste
 

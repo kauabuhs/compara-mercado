@@ -52,7 +52,7 @@ pnpm dev:worker               # aba 3 (opcional) — ingestão; AI_PROVIDER=fake
 
 Atalhos: `pnpm dev:abas` abre o Windows Terminal com uma aba por processo (`-- -Worker` inclui o worker); no VS Code, **Terminal → Executar tarefa → "Iniciar Back + Front"** abre um painel dedicado para cada um; `pnpm dev` roda os dois num único terminal (Turborepo).
 
-Login de admin local (só desenvolvimento): `admin@local.test` / `admin123456`. Os e-mails de login caem no Mailpit em http://127.0.0.1:54324. Acesse sempre por `localhost`, não `127.0.0.1` (o cookie do PKCE é por host).
+Login de admin local (só desenvolvimento): entre em http://localhost:3000/entrar com `admin@local.test` / `admin123456`; o painel aparece em **Conta → Painel interno** (`/admin`). Novas contas (cadastro, confirmação de e-mail, recuperação de senha e link de acesso) mandam e-mails que caem no Mailpit em http://127.0.0.1:54324. Acesse sempre por `localhost`, não `127.0.0.1` (o cookie do PKCE é por host). Como promover alguém a admin: [runbook](docs/runbooks/promover-admin.md).
 
 > O stack local sobe só o necessário (6 contêineres: Postgres, Kong, PostgREST, Auth, Storage e Mailpit).
 > Studio, Realtime, Edge Runtime e Analytics ficam desligados em `ComparaMercado-Back/supabase/config.toml`
@@ -80,7 +80,7 @@ Testes de integração contra o Supabase local (paridade SQL ↔ TypeScript da c
 
 ```bash
 eval "$(pnpm exec supabase status -o env --workdir ComparaMercado-Back | sed 's/^/export /')"
-SUPABASE_TEST_URL="$API_URL" SUPABASE_TEST_ANON_KEY="$ANON_KEY" \
+SUPABASE_TEST_URL="$API_URL" SUPABASE_TEST_ANON_KEY="$ANON_KEY" SUPABASE_TEST_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY" \
   SUPABASE_TEST_ADMIN_EMAIL=admin@local.test SUPABASE_TEST_ADMIN_PASSWORD=admin123456 \
   pnpm --filter comparamercado-back test
 ```

@@ -24,8 +24,10 @@ Metas do plano (a calibrar com dados reais): 50 usuários ativos/semana · ≥ 7
 - ✅ Mercados com mapa (MapLibre/OSM) e distância; ofertas; PWA instalável + última lista offline
 - ✅ Layout responsivo (360 px → desktop), navegação inferior/lateral, modo claro/escuro
 - ✅ Admin: lançar preço manual (publica e atualiza `current_prices`) e fila de revisão
+- ✅ Lista de compras sincronizada com a conta (sem login continua no aparelho, inclusive offline) — [ADR-0015](adr/0015-lista-de-compras-na-conta.md)
+- ✅ Admin: moderação de preços denunciados (retirar preço publicado, manter, motivo da rejeição visível a quem enviou) — [ADR-0016](adr/0016-moderacao-de-precos.md)
 - 🟡 Seed com **6 mercados e 48 produtos** (plano pede ~100): ampliar com a cesta real da cidade
-- 🟡 Admin: cadastro (CRUD) de cidades, mercados e produtos — hoje por SQL/seed
+- ✅ Admin: cadastro de cidades, mercados, categorias e produtos (criar, editar, desativar/arquivar) — [ADR-0013](adr/0013-cadastro-base-pelo-painel-admin.md). Falta importação em lote e edição de marca
 - ⬜ Histórico por produto por mercado na tela (existe por produto), alerta de preço, scanner de código de barras, onboarding de 3 telas, mercados favoritos, sugestões de busca
 
 ## Fase 2 — Encartes com IA
@@ -50,11 +52,22 @@ Metas do plano (a calibrar com dados reais): 50 usuários ativos/semana · ≥ 7
 - ⬜ Leitura da etiqueta por IA e confirmação em 2 toques, reputação e pontos, publicação automática (só depois de validar o MVP)
 - ⬜ Teste de abuso; spike NFC-e (técnico + jurídico) → ADR
 
+## Comunidade e portal do mercado (plano de 2026-11-13)
+
+Decisões: [ADR-0009](adr/0009-perfil-consentimento-e-cidade.md) (perfil, consentimento, cidade), [ADR-0010](adr/0010-comunidade-de-precos-e-confianca.md) (feed, corroboração, reputação) e [ADR-0011](adr/0011-portal-do-mercado.md) (lojista e campanhas). Ordem: **comunidade primeiro**, mercado depois.
+
+- ✅ Fase 0 — fundação: ADRs 0009–0011, `docs/api.md` atualizado, seletor de cidade (cookie + perfil) e filtro de mercados por cidade
+- ✅ Fase 1 — comunidade MVP (banco, API, telas): confirmações, denúncias, reputação, `GET /v1/community/feed`, `/comunidade`, `/conta/reputacao`, apelido público, navegação (Comunidade no lugar de Ofertas) e botão "Publicar". **Falta:** beta fechado na cidade piloto, exportar/excluir conta (LGPD) antes de abrir ao público, e evoluir `/contribuir` em passos (mercado mais próximo primeiro)
+- ⬜ Fase 2 — portal do mercado: `store_members`, aprovação no admin, preços `store_panel` com selo _Oficial_, `/mercados/[id]`, portal `/loja`
+- ⬜ Fase 3 — campanhas e retenção: campanhas com revisão, métricas, alerta de preço, web push, avaliar Realtime/SSE
+
 ## Fase 4 — Beta
 
 **Critério:** 50 usuários ativos/semana; nenhum erro crítico aberto.
 
-- ⬜ Política de privacidade e termos; exportar/excluir conta (LGPD)
+- ✅ Acesso: cadastro com confirmação de e-mail e aceite dos termos, login com senha (+ link de acesso), recuperação de senha e perfil da conta ([ADR-0012](adr/0012-autenticacao-e-acesso-admin.md)); como promover admin: [runbook](runbooks/promover-admin.md)
+- 🟡 Política de privacidade e termos: texto inicial publicado em `/privacidade` e `/termos`; **falta revisão jurídica e o canal de contato do responsável**
+- ⬜ Exportar/excluir conta (LGPD)
 - ⬜ Sentry, PostHog, monitor externo, alertas de fila e orçamento
 - ⬜ Auditoria de acessibilidade/desempenho (LCP < 2,5 s em 4G), teste de usabilidade com 5 pessoas
 - ⬜ CSP com nonce, rate limit distribuído, CAPTCHA no login (ADR-0003)
@@ -64,7 +77,7 @@ Metas do plano (a calibrar com dados reais): 50 usuários ativos/semana · ≥ 7
 1. Aprovar o ADR-0001 e decidir **nome, cidade e mercados** (decisões em aberto).
 2. Rodar os **dois spikes** (3 encartes reais com IA; NFC-e) — são os riscos que derrubam o projeto.
 3. Criar projetos Supabase staging/produção e conectar Vercel + GitHub.
-4. Terminar o CRUD de admin e ampliar o seed para ~100 itens; testar com 5 pessoas reais.
+4. Cadastrar o catálogo real pelo painel (ou importação em lote) e testar com 5 pessoas reais.
 
 ## Separação front-end / back-end (2026-11-11)
 

@@ -1,6 +1,6 @@
 # ADR-0008 — Contribuição de preços com foto (MVP)
 
-- **Status:** Aceito (MVP, para validar com um beta fechado)
+- **Status:** Aceito (MVP, para validar com um beta fechado). A visibilidade da foto foi ampliada pelo [ADR-0010](0010-comunidade-de-precos-e-confianca.md).
 - **Data:** 2026-11-12
 - **Decisor:** Kauã Buhs
 - **Relacionados:** [ADR-0003](0003-seguranca-web.md) (segurança web), [ADR-0005](0005-separacao-frontend-backend.md) (o navegador só fala com o Next)
