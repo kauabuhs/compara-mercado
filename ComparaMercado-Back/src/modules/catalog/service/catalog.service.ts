@@ -6,6 +6,7 @@ import {
   getPriceHistory,
   getProduct,
   getProductPrices,
+  listCities,
   listOffers,
   listStores,
   searchProducts,
@@ -56,6 +57,11 @@ export function createCatalogService(publicDb: Db, now: () => Date): CatalogServ
     },
 
     listStores: (query) => listStores(publicDb, query.cityId),
+
+    async listCities() {
+      const rows = await listCities(publicDb);
+      return rows.map((row) => ({ id: row.id, name: row.name, uf: row.uf ?? "" }));
+    },
 
     compareList: (request) => compareList(publicDb, request.items, request.where),
   };

@@ -1,4 +1,5 @@
 import type {
+  City,
   CompareListRequest,
   ListComparison,
   OffersQuery,
@@ -23,5 +24,7 @@ export interface CatalogService {
   getProductDetails(productId: string): Promise<ProductDetails | null>;
   listOffers(query: OffersQuery): Promise<Paged<PriceOffer>>;
   listStores(query: StoresQuery): Promise<Store[]>;
+  /** Cidades habilitadas no comparador, em ordem alfabética. */
+  listCities(): Promise<City[]>;
   compareList(request: CompareListRequest): Promise<ListComparison>;
 }

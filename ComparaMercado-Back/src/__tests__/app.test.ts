@@ -6,7 +6,11 @@ import { DomainError } from "../lib/domain-error";
 import { createLogger } from "../lib/logger";
 import { RateLimiter } from "../middlewares/rate-limit";
 import type { AdminService } from "../modules/admin/admin.types";
+import type { CommunityService } from "../modules/community/community.types";
 import type { ContributionService } from "../modules/contributions/contributions.types";
+import type { MyListService } from "../modules/my-list/my-list.types";
+import type { ProfileService } from "../modules/profile/profile.types";
+import type { RegistryService } from "../modules/registry/registry.types";
 import type { Services } from "../services";
 
 const PRODUCT_ID = "6f1b1b0e-5b0e-4b7a-9d57-2d6f6c2a7e11";
@@ -50,12 +54,33 @@ function createAdminServiceStub(): AdminService {
       activeStores: 6,
       activeProducts: 48,
       currentPrices: 265,
+      openModerationTasks: 1,
     }),
+    getModerationQueue: vi.fn().mockResolvedValue({ items: [], total: 0 }),
+    resolveModerationTask: vi.fn().mockResolvedValue(true),
     getPriceFormOptions: vi.fn().mockResolvedValue({ stores: [], products: [] }),
     getReviewQueue: vi.fn().mockResolvedValue({ items: [], total: 0 }),
     createManualPrice: vi.fn().mockResolvedValue(undefined),
     reviewObservation: vi.fn().mockResolvedValue(true),
     getObservationPhoto: vi.fn().mockResolvedValue(null),
+  };
+}
+
+function createRegistryServiceStub(): RegistryService {
+  const page = { items: [], total: 0 };
+  return {
+    listCities: vi.fn().mockResolvedValue(page),
+    createCity: vi.fn(),
+    updateCity: vi.fn().mockResolvedValue(null),
+    listStores: vi.fn().mockResolvedValue(page),
+    createStore: vi.fn(),
+    updateStore: vi.fn().mockResolvedValue(null),
+    listCategories: vi.fn().mockResolvedValue(page),
+    createCategory: vi.fn(),
+    updateCategory: vi.fn().mockResolvedValue(null),
+    listProducts: vi.fn().mockResolvedValue(page),
+    createProduct: vi.fn(),
+    updateProduct: vi.fn().mockResolvedValue(null),
   };
 }
 
@@ -66,11 +91,52 @@ function createContributionServiceStub(): ContributionService {
   };
 }
 
+function createCommunityServiceStub(): CommunityService {
+  return {
+    feed: vi.fn().mockResolvedValue({ items: [], nextCursor: null }),
+    confirm: vi.fn().mockResolvedValue({ status: "pending", confirmCount: 1, changedCount: 0 }),
+    report: vi.fn().mockResolvedValue(undefined),
+    getPhoto: vi.fn().mockResolvedValue(null),
+    reputation: vi.fn().mockResolvedValue({ points: 14, level: 0, nextLevelAt: 50, events: [] }),
+  };
+}
+
+const sampleProfile = {
+  email: "admin@example.test",
+  displayName: "Maria",
+  publicNickname: null,
+  phone: null,
+  cityId: null,
+  termsVersion: "2026-11",
+  termsAcceptedAt: "2026-11-09T12:00:00Z",
+  createdAt: "2026-11-09T12:00:00Z",
+};
+
+function createProfileServiceStub(): ProfileService {
+  return {
+    get: vi.fn().mockResolvedValue(sampleProfile),
+    update: vi.fn().mockResolvedValue({ ...sampleProfile, displayName: "Maria S." }),
+  };
+}
+
 function buildTestApp(
-  options: { compareRateLimiter?: RateLimiter; submitRateLimiter?: RateLimiter } = {},
+  options: {
+    compareRateLimiter?: RateLimiter;
+    submitRateLimiter?: RateLimiter;
+    confirmRateLimiter?: RateLimiter;
+    reportRateLimiter?: RateLimiter;
+    listSyncRateLimiter?: RateLimiter;
+  } = {},
 ) {
+  const myListService: MyListService = {
+    sync: vi.fn(async (userId: string) => ({ items: [], updatedAt: null, ownerId: userId })),
+  };
   const adminService = createAdminServiceStub();
+  const registryService = createRegistryServiceStub();
   const contributionService = createContributionServiceStub();
+  const profileService = createProfileServiceStub();
+  const communityService = createCommunityServiceStub();
+  const forget = vi.fn();
   const tokens: Record<string, SessionUser> = {
     "admin-token": adminUser,
     "user-token": regularUser,
@@ -83,19 +149,42 @@ function buildTestApp(
       getProductDetails: vi.fn().mockResolvedValue(null),
       listOffers: vi.fn().mockResolvedValue({ items: [sampleOffer], total: 41 }),
       listStores: vi.fn().mockResolvedValue([]),
+      listCities: vi
+        .fn()
+        .mockResolvedValue([
+          { id: "5e8f4f1c-1b1a-4c8a-9b0e-7b1f0a9d3c01", name: "Caxias", uf: "RS" },
+        ]),
       compareList: vi.fn().mockResolvedValue(emptyComparison),
     },
-    authenticator: { authenticate: vi.fn(async (token: string) => tokens[token] ?? null) },
+    cities: { search: vi.fn().mockResolvedValue([]), get: vi.fn().mockResolvedValue(null) },
+    authenticator: { authenticate: vi.fn(async (token: string) => tokens[token] ?? null), forget },
     adminFor: vi.fn(() => adminService),
+    registryFor: vi.fn(() => registryService),
+    myListFor: vi.fn(() => myListService),
     contributionsFor: vi.fn(() => contributionService),
+    communityFor: vi.fn(() => communityService),
+    profileFor: vi.fn(() => profileService),
   };
   const app = createApp({
     services,
     logger: createLogger("silent", "api"),
     ...(options.compareRateLimiter ? { compareRateLimiter: options.compareRateLimiter } : {}),
     ...(options.submitRateLimiter ? { submitRateLimiter: options.submitRateLimiter } : {}),
+    ...(options.confirmRateLimiter ? { confirmRateLimiter: options.confirmRateLimiter } : {}),
+    ...(options.reportRateLimiter ? { reportRateLimiter: options.reportRateLimiter } : {}),
+    ...(options.listSyncRateLimiter ? { listSyncRateLimiter: options.listSyncRateLimiter } : {}),
   });
-  return { app, services, adminService, contributionService };
+  return {
+    app,
+    services,
+    adminService,
+    myListService,
+    registryService,
+    contributionService,
+    profileService,
+    communityService,
+    forget,
+  };
 }
 
 interface ResponseBody {
@@ -359,7 +448,90 @@ describe("administração", () => {
 
     const ok = await app.request(path, jsonPost({ decision: "rejected" }, bearer("admin-token")));
     expect(ok.status).toBe(200);
-    expect(adminService.reviewObservation).toHaveBeenCalledWith(OBSERVATION_ID, "rejected");
+    expect(adminService.reviewObservation).toHaveBeenCalledWith(
+      OBSERVATION_ID,
+      "rejected",
+      undefined,
+    );
+  });
+
+  it("rejeição leva o motivo para o serviço e recusa motivo fora do tamanho", async () => {
+    const { app, adminService } = buildTestApp();
+    const path = `/v1/admin/observations/${OBSERVATION_ID}/review`;
+    for (const note of ["ab", "x".repeat(201)]) {
+      const response = await app.request(
+        path,
+        jsonPost({ decision: "rejected", note }, bearer("admin-token")),
+      );
+      expect(response.status).toBe(400);
+    }
+    expect(adminService.reviewObservation).not.toHaveBeenCalled();
+
+    const ok = await app.request(
+      path,
+      jsonPost(
+        { decision: "rejected", note: "  O preço não confere com a foto  " },
+        bearer("admin-token"),
+      ),
+    );
+    expect(ok.status).toBe(200);
+    expect(adminService.reviewObservation).toHaveBeenCalledWith(
+      OBSERVATION_ID,
+      "rejected",
+      "O preço não confere com a foto",
+    );
+  });
+
+  describe("moderação", () => {
+    const TASK_ID = "7c2d3b4e-5f6a-4b7c-8d9e-0a1b2c3d4e5f";
+    const taskPath = `/v1/admin/moderation/${TASK_ID}`;
+
+    it("exige papel admin e lista a fila paginada", async () => {
+      const { app, services } = buildTestApp();
+      expect((await app.request("/v1/admin/moderation")).status).toBe(401);
+      expect(
+        (await app.request("/v1/admin/moderation", { headers: bearer("user-token") })).status,
+      ).toBe(403);
+      expect(services.adminFor).not.toHaveBeenCalled();
+
+      const response = await app.request("/v1/admin/moderation?page=2", {
+        headers: bearer("admin-token"),
+      });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ items: [], total: 0, page: 2, pageSize: 20 });
+    });
+
+    it("valida a decisão, o id e o motivo antes de chamar o serviço", async () => {
+      const { app, adminService } = buildTestApp();
+      const bad = [
+        { path: taskPath, body: { action: "apagar" } },
+        { path: taskPath, body: { action: "reject", note: "ab" } },
+        { path: "/v1/admin/moderation/x", body: { action: "keep" } },
+      ];
+      for (const { path, body } of bad) {
+        const response = await app.request(path, jsonPost(body, bearer("admin-token")));
+        expect(response.status).toBe(400);
+      }
+      expect(adminService.resolveModerationTask).not.toHaveBeenCalled();
+    });
+
+    it("repassa a decisão com o id do admin e devolve 404 se a tarefa já foi encerrada", async () => {
+      const { app, adminService } = buildTestApp();
+      const ok = await app.request(
+        taskPath,
+        jsonPost({ action: "reject", note: "Preço fora da realidade" }, bearer("admin-token")),
+      );
+      expect(ok.status).toBe(200);
+      expect(adminService.resolveModerationTask).toHaveBeenCalledWith(
+        TASK_ID,
+        { action: "reject", note: "Preço fora da realidade" },
+        adminUser.id,
+      );
+
+      vi.mocked(adminService.resolveModerationTask).mockResolvedValueOnce(false);
+      const gone = await app.request(taskPath, jsonPost({ action: "keep" }, bearer("admin-token")));
+      expect(gone.status).toBe(404);
+    });
   });
 
   it("revisar observação inexistente ou já decidida devolve 404, não falso sucesso", async () => {
@@ -596,5 +768,533 @@ describe("contribuição de preços com foto", () => {
       (await app.request("/v1/admin/observations/x/photo", { headers: bearer("admin-token") }))
         .status,
     ).toBe(400);
+  });
+});
+
+describe("conta: perfil e cidades", () => {
+  const patch = (body: unknown, token = "user-token") => ({
+    method: "PATCH",
+    headers: { "content-type": "application/json", ...bearer(token) },
+    body: JSON.stringify(body),
+  });
+
+  it("exige login para ler e editar o perfil", async () => {
+    const { app, services } = buildTestApp();
+    expect((await app.request("/v1/me/profile")).status).toBe(401);
+    expect((await app.request("/v1/me/profile", { method: "PATCH", body: "{}" })).status).toBe(401);
+    expect(services.profileFor).not.toHaveBeenCalled();
+  });
+
+  it("lê o perfil do usuário logado (qualquer papel) sem cache", async () => {
+    const { app, services } = buildTestApp();
+    const response = await app.request("/v1/me/profile", { headers: bearer("user-token") });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(services.profileFor).toHaveBeenCalledWith("user-token");
+  });
+
+  it("edita só os campos enviados e esquece a sessão em cache", async () => {
+    const { app, profileService, forget } = buildTestApp();
+    const response = await app.request("/v1/me/profile", patch({ displayName: "Maria S." }));
+    expect(response.status).toBe(200);
+    expect(profileService.update).toHaveBeenCalledWith(regularUser, { displayName: "Maria S." });
+    expect(forget).toHaveBeenCalledWith("user-token");
+  });
+
+  it.each([
+    ["corpo vazio", {}],
+    ["campo desconhecido (papel não se edita)", { role: "admin" }],
+    ["nome curto demais", { displayName: "x" }],
+    ["apelido com símbolos", { publicNickname: "<script>" }],
+    ["apelido curto demais", { publicNickname: "x" }],
+    ["apelido longo demais", { publicNickname: "a".repeat(25) }],
+    ["cidade que não é uuid", { cityId: "caxias" }],
+  ])("recusa %s com 400", async (_label, body) => {
+    const { app, profileService } = buildTestApp();
+    const response = await app.request("/v1/me/profile", patch(body));
+    expect(response.status).toBe(400);
+    expect(profileService.update).not.toHaveBeenCalled();
+  });
+
+  it("traduz erros de negócio do perfil para 400 com código estável", async () => {
+    const { app, profileService, forget } = buildTestApp();
+    vi.mocked(profileService.update).mockRejectedValueOnce(
+      new DomainError("invalid_phone", "Telefone inválido."),
+    );
+    const response = await app.request("/v1/me/profile", patch({ phone: "abc" }));
+    expect(response.status).toBe(400);
+    expect((await bodyOf(response)).error.code).toBe("invalid_phone");
+    expect(forget).not.toHaveBeenCalled();
+  });
+
+  it("lista as cidades habilitadas sem exigir login", async () => {
+    const { app } = buildTestApp();
+    const response = await app.request("/v1/cities");
+    expect(response.status).toBe(200);
+    expect(((await response.json()) as { cities: unknown[] }).cities).toHaveLength(1);
+  });
+});
+
+describe("API — comunidade", () => {
+  const CITY_ID = "5e8f4f1c-1b1a-4c8a-9b0e-7b1f0a9d3c01";
+  const feedUrl = (extra = "") => `/v1/community/feed?cityId=${CITY_ID}${extra}`;
+  const confirmUrl = `/v1/community/observations/${OBSERVATION_ID}/confirmations`;
+  const reportUrl = `/v1/community/observations/${OBSERVATION_ID}/reports`;
+  const photoUrl = `/v1/community/observations/${OBSERVATION_ID}/photo`;
+  const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
+  const post = (body: unknown, token = "user-token") => ({
+    method: "POST",
+    headers: { ...bearer(token), "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const errorCode = async (response: Response) =>
+    ((await response.json()) as { error: { code: string } }).error.code;
+
+  it("o feed é público: visitante lê sem login e o serviço recebe `null` no lugar do token", async () => {
+    const { app, services, communityService } = buildTestApp();
+    const response = await app.request(feedUrl("&promo=1&limit=10"));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ items: [], nextCursor: null });
+    expect(services.communityFor).toHaveBeenCalledWith(null);
+    expect(communityService.feed).toHaveBeenCalledWith({
+      cityId: CITY_ID,
+      promoOnly: true,
+      limit: 10,
+    });
+  });
+
+  it("com sessão válida o feed usa o token do usuário e nunca é compartilhado em cache", async () => {
+    const { app, services } = buildTestApp();
+    const response = await app.request(feedUrl(), { headers: bearer("user-token") });
+    expect(response.status).toBe(200);
+    expect(services.communityFor).toHaveBeenCalledWith("user-token");
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+  });
+
+  it("token inválido no feed é tratado como visitante (a leitura é pública)", async () => {
+    const { app, services } = buildTestApp();
+    const response = await app.request(feedUrl(), { headers: bearer("token-ruim") });
+    expect(response.status).toBe(200);
+    expect(services.communityFor).toHaveBeenCalledWith(null);
+  });
+
+  it("o feed anônimo sem posição é cacheado; com posição não", async () => {
+    const { app, communityService } = buildTestApp();
+    expect((await app.request(feedUrl())).headers.get("x-cache")).toBe("MISS");
+    expect((await app.request(feedUrl())).headers.get("x-cache")).toBe("HIT");
+    expect(communityService.feed).toHaveBeenCalledTimes(1);
+
+    const withPosition = await app.request(feedUrl("&lat=-29.17&lng=-51.18"));
+    expect(withPosition.headers.get("x-cache")).toBeNull();
+    expect(communityService.feed).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(communityService.feed).mock.calls[1]?.[0]).toMatchObject({
+      where: { lat: -29.17, lng: -51.18 },
+    });
+  });
+
+  it.each([
+    ["sem cidade", "/v1/community/feed"],
+    ["cidade que não é uuid", "/v1/community/feed?cityId=caxias"],
+    ["latitude sem longitude", `/v1/community/feed?cityId=${CITY_ID}&lat=-29.1`],
+    ["raio sem posição", `/v1/community/feed?cityId=${CITY_ID}&radiusM=1000`],
+    ["limite acima do teto", `/v1/community/feed?cityId=${CITY_ID}&limit=51`],
+  ])("recusa o feed %s com 400", async (_label, url) => {
+    const { app, communityService } = buildTestApp();
+    expect((await app.request(url)).status).toBe(400);
+    expect(communityService.feed).not.toHaveBeenCalled();
+  });
+
+  it("cursor inválido vira 400 com código estável", async () => {
+    const { app, communityService } = buildTestApp();
+    vi.mocked(communityService.feed).mockRejectedValueOnce(
+      new DomainError("invalid_cursor", "Cursor de paginação inválido."),
+    );
+    const response = await app.request(feedUrl("&cursor=lixo"));
+    expect(response.status).toBe(400);
+    expect(await errorCode(response)).toBe("invalid_cursor");
+  });
+
+  it("confirmar, denunciar, ver foto e reputação exigem login", async () => {
+    const { app, services } = buildTestApp();
+    const anonymousPost = (url: string, body: unknown) =>
+      app.request(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    expect((await anonymousPost(confirmUrl, { verdict: "confirm" })).status).toBe(401);
+    expect((await anonymousPost(reportUrl, { reason: "spam" })).status).toBe(401);
+    expect((await app.request(photoUrl)).status).toBe(401);
+    expect((await app.request("/v1/me/reputation")).status).toBe(401);
+    expect(services.communityFor).not.toHaveBeenCalled();
+  });
+
+  it("confirma a publicação com o token do usuário e devolve o resultado", async () => {
+    const { app, services, communityService } = buildTestApp();
+    const response = await app.request(confirmUrl, post({ verdict: "confirm" }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: "pending", confirmCount: 1, changedCount: 0 });
+    expect(services.communityFor).toHaveBeenCalledWith("user-token");
+    expect(communityService.confirm).toHaveBeenCalledWith(OBSERVATION_ID, "confirm");
+  });
+
+  it.each([
+    ["veredito desconhecido", { verdict: "talvez" }],
+    ["corpo vazio", {}],
+    ["campo extra", { verdict: "confirm", userId: "x" }],
+  ])("recusa confirmação com %s", async (_label, body) => {
+    const { app, communityService } = buildTestApp();
+    expect((await app.request(confirmUrl, post(body))).status).toBe(400);
+    expect(communityService.confirm).not.toHaveBeenCalled();
+  });
+
+  it("recusa id de publicação que não é uuid", async () => {
+    const { app } = buildTestApp();
+    const response = await app.request(
+      "/v1/community/observations/abc/confirmations",
+      post({ verdict: "confirm" }),
+    );
+    expect(response.status).toBe(400);
+  });
+
+  it.each([
+    ["own_observation", 403],
+    ["observation_unavailable", 404],
+    ["already_done", 409],
+    ["daily_limit", 429],
+  ])("traduz %s para HTTP %i", async (code, status) => {
+    const { app, communityService } = buildTestApp();
+    vi.mocked(communityService.confirm).mockRejectedValueOnce(new DomainError(code, "msg"));
+    const response = await app.request(confirmUrl, post({ verdict: "confirm" }));
+    expect(response.status).toBe(status);
+    expect(await errorCode(response)).toBe(code);
+  });
+
+  it("limita as confirmações por usuário, sem punir outra pessoa", async () => {
+    const { app, communityService } = buildTestApp({
+      confirmRateLimiter: new RateLimiter(2, 60_000),
+    });
+    const confirm = (token: string) => app.request(confirmUrl, post({ verdict: "confirm" }, token));
+    expect((await confirm("user-token")).status).toBe(200);
+    expect((await confirm("user-token")).status).toBe(200);
+    const limited = await confirm("user-token");
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("retry-after")).not.toBeNull();
+    expect((await confirm("other-token")).status).toBe(200);
+    expect(communityService.confirm).toHaveBeenCalledTimes(3);
+  });
+
+  it("denuncia com um motivo válido e responde 201", async () => {
+    const { app, communityService } = buildTestApp();
+    const response = await app.request(reportUrl, post({ reason: "wrong_price" }));
+    expect(response.status).toBe(201);
+    expect(communityService.report).toHaveBeenCalledWith(OBSERVATION_ID, "wrong_price");
+
+    const invalid = await app.request(reportUrl, post({ reason: "odeio" }));
+    expect(invalid.status).toBe(400);
+  });
+
+  it("serve a foto como JPEG privado, ou 404 se não houver foto visível", async () => {
+    const { app, communityService } = buildTestApp();
+    const missing = await app.request(photoUrl, { headers: bearer("user-token") });
+    expect(missing.status).toBe(404);
+
+    vi.mocked(communityService.getPhoto).mockResolvedValueOnce(new Uint8Array([0xff, 0xd8, 0xff]));
+    const found = await app.request(photoUrl, { headers: bearer("user-token") });
+    expect(found.status).toBe(200);
+    expect(found.headers.get("content-type")).toBe("image/jpeg");
+    expect(found.headers.get("cache-control")).toContain("private");
+    expect(new Uint8Array(await found.arrayBuffer())).toEqual(new Uint8Array([0xff, 0xd8, 0xff]));
+  });
+
+  it("devolve a reputação do próprio usuário", async () => {
+    const { app, communityService } = buildTestApp();
+    const response = await app.request("/v1/me/reputation", { headers: bearer("user-token") });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ points: 14, level: 0, nextLevelAt: 50 });
+    expect(communityService.reputation).toHaveBeenCalledWith(regularUser.id);
+  });
+});
+
+describe("cadastro-base (admin)", () => {
+  const CITY_ID = "5e8f4f1c-1b1a-4c8a-9b0e-7b1f0a9d3c01";
+  const jsonPatch = (body: unknown, headers: Record<string, string> = {}) => ({
+    method: "PATCH",
+    headers: { "content-type": "application/json", ...headers },
+    body: JSON.stringify(body),
+  });
+  const validCity = { name: "Passo Fundo", uf: "rs", ibgeCode: "4314100" };
+  const validStore = {
+    name: "Mercado Centro",
+    cityId: CITY_ID,
+    lat: -29.17,
+    lng: -51.18,
+  };
+  const validProduct = { name: "Arroz Tipo 1", sizeValue: 5, sizeUnit: "kg" };
+
+  it("exige login e papel admin em toda rota, sem tocar nos dados", async () => {
+    const { app, services } = buildTestApp();
+    const requests: [string, RequestInit][] = [
+      ["/v1/admin/cities", {}],
+      ["/v1/admin/stores", {}],
+      ["/v1/admin/categories", {}],
+      ["/v1/admin/products", {}],
+      ["/v1/admin/cities", jsonPost(validCity)],
+      [`/v1/admin/cities/${CITY_ID}`, jsonPatch({ active: true })],
+    ];
+    for (const [path, init] of requests) {
+      expect((await app.request(path, init)).status).toBe(401);
+      const asUser = { ...init, headers: { ...init.headers, ...bearer("user-token") } };
+      expect((await app.request(path, asUser)).status).toBe(403);
+    }
+    expect(services.registryFor).not.toHaveBeenCalled();
+  });
+
+  it("lista com paginação e filtros validados", async () => {
+    const { app, registryService } = buildTestApp();
+    const response = await app.request("/v1/admin/products?q=arroz&situation=inactive&page=2", {
+      headers: bearer("admin-token"),
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ items: [], total: 0, page: 2, pageSize: 20 });
+    expect(registryService.listProducts).toHaveBeenCalledWith({
+      q: "arroz",
+      situation: "inactive",
+      page: 2,
+      pageSize: 20,
+    });
+    const invalid = await app.request("/v1/admin/products?situation=qualquer", {
+      headers: bearer("admin-token"),
+    });
+    expect(invalid.status).toBe(400);
+  });
+
+  it("cria cidade normalizando a UF e recusa corpo inválido", async () => {
+    const { app, registryService } = buildTestApp();
+    const invalid = [
+      { ...validCity, ibgeCode: "123" },
+      { ...validCity, uf: "RSX" },
+      { ...validCity, name: "A" },
+    ];
+    for (const body of invalid) {
+      const response = await app.request("/v1/admin/cities", jsonPost(body, bearer("admin-token")));
+      expect(response.status).toBe(400);
+    }
+    expect(registryService.createCity).not.toHaveBeenCalled();
+
+    vi.mocked(registryService.createCity).mockResolvedValue({
+      id: CITY_ID,
+      name: "Passo Fundo",
+      uf: "RS",
+      ibgeCode: "4314100",
+      active: false,
+    });
+    const created = await app.request(
+      "/v1/admin/cities",
+      jsonPost(validCity, bearer("admin-token")),
+    );
+    expect(created.status).toBe(201);
+    expect(registryService.createCity).toHaveBeenCalledWith({
+      name: "Passo Fundo",
+      uf: "RS",
+      ibgeCode: "4314100",
+      active: false,
+    });
+  });
+
+  it("traduz duplicidade (409) e referência inexistente (400) em respostas padronizadas", async () => {
+    const { app, registryService } = buildTestApp();
+    vi.mocked(registryService.createCity).mockRejectedValue(
+      new DomainError("duplicate", "Já existe um registro com esses dados."),
+    );
+    const duplicate = await app.request(
+      "/v1/admin/cities",
+      jsonPost(validCity, bearer("admin-token")),
+    );
+    expect(duplicate.status).toBe(409);
+    expect((await bodyOf(duplicate)).error.code).toBe("duplicate");
+
+    vi.mocked(registryService.createStore).mockRejectedValue(
+      new DomainError("invalid_reference", "Uma das referências informadas não existe."),
+    );
+    const orphan = await app.request(
+      "/v1/admin/stores",
+      jsonPost(validStore, bearer("admin-token")),
+    );
+    expect(orphan.status).toBe(400);
+    expect((await bodyOf(orphan)).error.code).toBe("invalid_reference");
+  });
+
+  it("cria mercado com padrões (ativo, sem CNPJ) e valida coordenadas", async () => {
+    const { app, registryService } = buildTestApp();
+    for (const body of [
+      { ...validStore, lat: 91 },
+      { ...validStore, lng: -181 },
+      { ...validStore, cnpj: "12.345.678/0001-90" },
+      { ...validStore, cityId: "x" },
+    ]) {
+      const response = await app.request("/v1/admin/stores", jsonPost(body, bearer("admin-token")));
+      expect(response.status).toBe(400);
+    }
+    vi.mocked(registryService.createStore).mockResolvedValue({
+      id: STORE_ID,
+      ...validStore,
+      cityName: "Passo Fundo",
+      cnpj: null,
+      address: null,
+      neighborhood: null,
+      status: "active",
+    });
+    const created = await app.request(
+      "/v1/admin/stores",
+      jsonPost(validStore, bearer("admin-token")),
+    );
+    expect(created.status).toBe(201);
+    expect(registryService.createStore).toHaveBeenCalledWith({
+      ...validStore,
+      cnpj: null,
+      address: null,
+      neighborhood: null,
+      status: "active",
+    });
+  });
+
+  it("PATCH exige ao menos um campo e as coordenadas juntas; 404 quando não existe", async () => {
+    const { app, registryService } = buildTestApp();
+    const empty = await app.request(
+      `/v1/admin/stores/${STORE_ID}`,
+      jsonPatch({}, bearer("admin-token")),
+    );
+    expect(empty.status).toBe(400);
+    const halfPoint = await app.request(
+      `/v1/admin/stores/${STORE_ID}`,
+      jsonPatch({ lat: -29.1 }, bearer("admin-token")),
+    );
+    expect(halfPoint.status).toBe(400);
+    expect(registryService.updateStore).not.toHaveBeenCalled();
+
+    const missing = await app.request(
+      `/v1/admin/stores/${STORE_ID}`,
+      jsonPatch({ status: "inactive" }, bearer("admin-token")),
+    );
+    expect(missing.status).toBe(404);
+    expect(registryService.updateStore).toHaveBeenCalledWith(STORE_ID, { status: "inactive" });
+
+    const badId = await app.request(
+      "/v1/admin/stores/nao-e-uuid",
+      jsonPatch({ status: "active" }, bearer("admin-token")),
+    );
+    expect(badId.status).toBe(400);
+  });
+
+  it("produto: GTIN malformado é recusado e o arquivamento chega ao serviço", async () => {
+    const { app, registryService } = buildTestApp();
+    const badGtin = await app.request(
+      "/v1/admin/products",
+      jsonPost({ ...validProduct, gtin: "123" }, bearer("admin-token")),
+    );
+    expect(badGtin.status).toBe(400);
+    const badSize = await app.request(
+      "/v1/admin/products",
+      jsonPost({ ...validProduct, sizeValue: 0 }, bearer("admin-token")),
+    );
+    expect(badSize.status).toBe(400);
+    expect(registryService.createProduct).not.toHaveBeenCalled();
+
+    vi.mocked(registryService.updateProduct).mockResolvedValue({
+      id: PRODUCT_ID,
+      name: "Arroz Tipo 1",
+      brand: null,
+      categoryId: null,
+      gtin: null,
+      sizeValue: 5,
+      sizeUnit: "kg",
+      status: "archived",
+    });
+    const archived = await app.request(
+      `/v1/admin/products/${PRODUCT_ID}`,
+      jsonPatch({ status: "archived" }, bearer("admin-token")),
+    );
+    expect(archived.status).toBe(200);
+    expect(registryService.updateProduct).toHaveBeenCalledWith(PRODUCT_ID, { status: "archived" });
+  });
+});
+
+describe("lista de compras na conta", () => {
+  const PRODUCT_B = "7e2d3b4e-5f6a-4b7c-8d9e-0a1b2c3d4e5f";
+  const validSync = {
+    items: [{ productId: PRODUCT_ID, quantity: 2 }],
+    baseUpdatedAt: null,
+    dirty: true,
+    localOwnerId: null,
+  };
+
+  it("exige login e não toca nos dados sem ele", async () => {
+    const { app, services } = buildTestApp();
+    const anonymous = await app.request("/v1/me/list/sync", jsonPost(validSync));
+    expect(anonymous.status).toBe(401);
+    expect(services.myListFor).not.toHaveBeenCalled();
+  });
+
+  it("repassa o pedido com o id da pessoa e devolve a lista sem cache", async () => {
+    const { app, myListService, services } = buildTestApp();
+    const response = await app.request(
+      "/v1/me/list/sync",
+      jsonPost(validSync, bearer("user-token")),
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.json()).toEqual({ items: [], updatedAt: null, ownerId: regularUser.id });
+    expect(services.myListFor).toHaveBeenCalledWith("user-token");
+    expect(myListService.sync).toHaveBeenCalledWith(regularUser.id, validSync);
+  });
+
+  it("valida o corpo: quantidade, produto, tamanho da lista e campos obrigatórios", async () => {
+    const { app, myListService } = buildTestApp();
+    const tooMany = Array.from({ length: 101 }, (_, index) => ({
+      productId: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+      quantity: 1,
+    }));
+    const invalid = [
+      { ...validSync, items: [{ productId: PRODUCT_ID, quantity: 0 }] },
+      { ...validSync, items: [{ productId: PRODUCT_ID, quantity: 100 }] },
+      { ...validSync, items: [{ productId: PRODUCT_ID, quantity: 1.5 }] },
+      { ...validSync, items: [{ productId: "x", quantity: 1 }] },
+      { ...validSync, items: tooMany },
+      { ...validSync, localOwnerId: "nao-e-uuid" },
+      { items: validSync.items },
+    ];
+    for (const body of invalid) {
+      const response = await app.request("/v1/me/list/sync", jsonPost(body, bearer("user-token")));
+      expect(response.status).toBe(400);
+    }
+    expect(myListService.sync).not.toHaveBeenCalled();
+    // lista vazia e dois produtos são válidos
+    const ok = await app.request(
+      "/v1/me/list/sync",
+      jsonPost(
+        {
+          ...validSync,
+          items: [
+            { productId: PRODUCT_ID, quantity: 1 },
+            { productId: PRODUCT_B, quantity: 99 },
+          ],
+        },
+        bearer("user-token"),
+      ),
+    );
+    expect(ok.status).toBe(200);
+  });
+
+  it("limita as sincronizações por pessoa, sem bloquear outra pessoa", async () => {
+    const { app } = buildTestApp({ listSyncRateLimiter: new RateLimiter(2, 60_000) });
+    const sync = (token: string) =>
+      app.request("/v1/me/list/sync", jsonPost(validSync, bearer(token)));
+    expect((await sync("user-token")).status).toBe(200);
+    expect((await sync("user-token")).status).toBe(200);
+    const blocked = await sync("user-token");
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get("retry-after")).not.toBeNull();
+    expect((await sync("other-token")).status).toBe(200);
   });
 });

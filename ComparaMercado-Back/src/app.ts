@@ -13,12 +13,23 @@ import { RateLimiter } from "./middlewares/rate-limit";
 import { adminRoutes } from "./modules/admin/controller/admin.controller";
 import { accountRoutes } from "./modules/auth/controller/auth.controller";
 import { catalogRoutes } from "./modules/catalog/controller/catalog.controller";
+import { citiesRoutes } from "./modules/cities/controller/cities.controller";
+import { communityRoutes } from "./modules/community/controller/community.controller";
 import { contributionRoutes } from "./modules/contributions/controller/contributions.controller";
+import { myListRoutes } from "./modules/my-list/controller/my-list.controller";
+import { profileRoutes } from "./modules/profile/controller/profile.controller";
+import { registryRoutes } from "./modules/registry/controller/registry.controller";
 import type { Services } from "./services";
 
 const MAX_BODY_BYTES = 64 * 1024;
 const COMPARE_MAX_REQUESTS_PER_MINUTE = 30;
+const CITY_SEARCH_MAX_REQUESTS_PER_MINUTE = 120;
 const SUBMIT_MAX_REQUESTS_PER_MINUTE = 6;
+const CONFIRM_MAX_REQUESTS_PER_MINUTE = 30;
+const REPORT_MAX_REQUESTS_PER_MINUTE = 10;
+const FEED_MAX_REQUESTS_PER_MINUTE = 120;
+const PHOTO_MAX_REQUESTS_PER_MINUTE = 300;
+const LIST_SYNC_MAX_REQUESTS_PER_MINUTE = 60;
 const REQUEST_ID_PATTERN = /^[\w-]{8,64}$/;
 
 export interface AppDependencies {
@@ -26,16 +37,34 @@ export interface AppDependencies {
   logger: Logger;
   /** Permite ajustar o limite em testes; em produção usa o padrão. */
   compareRateLimiter?: RateLimiter;
+  /** Idem, para a busca na biblioteca de cidades (roda a cada tecla no seletor). */
+  citySearchRateLimiter?: RateLimiter;
   /** Idem, para o envio de preço com foto (limite por usuário). */
   submitRateLimiter?: RateLimiter;
+  /** Idem, para confirmar publicações da comunidade (limite por usuário). */
+  confirmRateLimiter?: RateLimiter;
+  /** Idem, para denúncias (limite por usuário). */
+  reportRateLimiter?: RateLimiter;
+  /** Idem, para o feed da comunidade quando não vem do cache compartilhado (limite por IP). */
+  feedRateLimiter?: RateLimiter;
+  /** Idem, para fotos da comunidade (limite por usuário). */
+  photoRateLimiter?: RateLimiter;
+  /** Limite de sincronizações da lista de compras, por usuário (testes injetam um mais curto). */
+  listSyncRateLimiter?: RateLimiter;
 }
 
-/** Monta a API. Não abre porta nem lê ambiente: quem sobe o servidor é o `main.ts`. */
+/** Monta a API. Não abre porta nem lê ambiente: quem sobe o servidor é o `index.ts`. */
 export function createApp({
   services,
   logger,
   compareRateLimiter,
+  citySearchRateLimiter,
   submitRateLimiter,
+  confirmRateLimiter,
+  reportRateLimiter,
+  feedRateLimiter,
+  photoRateLimiter,
+  listSyncRateLimiter,
 }: AppDependencies) {
   const app = new Hono<AppEnv>();
 
@@ -84,10 +113,30 @@ export function createApp({
         compareRateLimiter ?? new RateLimiter(COMPARE_MAX_REQUESTS_PER_MINUTE, 60_000),
     }),
   );
+  app.route(
+    "/",
+    citiesRoutes({
+      cities: services.cities,
+      searchRateLimiter:
+        citySearchRateLimiter ?? new RateLimiter(CITY_SEARCH_MAX_REQUESTS_PER_MINUTE, 60_000),
+    }),
+  );
   app.route("/", accountRoutes(services.authenticator));
   app.route(
     "/",
+    profileRoutes({ authenticator: services.authenticator, profileFor: services.profileFor }),
+  );
+  app.route(
+    "/",
     adminRoutes({ authenticator: services.authenticator, adminFor: services.adminFor }),
+  );
+  // Tem a própria guarda (login + admin): o `authenticator` guarda em cache, então repetir é barato.
+  app.route(
+    "/",
+    registryRoutes({
+      authenticator: services.authenticator,
+      registryFor: services.registryFor,
+    }),
   );
   app.route(
     "/",
@@ -96,6 +145,30 @@ export function createApp({
       contributionsFor: services.contributionsFor,
       submitRateLimiter:
         submitRateLimiter ?? new RateLimiter(SUBMIT_MAX_REQUESTS_PER_MINUTE, 60_000),
+    }),
+  );
+
+  app.route(
+    "/",
+    myListRoutes({
+      authenticator: services.authenticator,
+      myListFor: services.myListFor,
+      syncRateLimiter:
+        listSyncRateLimiter ?? new RateLimiter(LIST_SYNC_MAX_REQUESTS_PER_MINUTE, 60_000),
+    }),
+  );
+
+  app.route(
+    "/",
+    communityRoutes({
+      authenticator: services.authenticator,
+      communityFor: services.communityFor,
+      confirmRateLimiter:
+        confirmRateLimiter ?? new RateLimiter(CONFIRM_MAX_REQUESTS_PER_MINUTE, 60_000),
+      reportRateLimiter:
+        reportRateLimiter ?? new RateLimiter(REPORT_MAX_REQUESTS_PER_MINUTE, 60_000),
+      feedRateLimiter: feedRateLimiter ?? new RateLimiter(FEED_MAX_REQUESTS_PER_MINUTE, 60_000),
+      photoRateLimiter: photoRateLimiter ?? new RateLimiter(PHOTO_MAX_REQUESTS_PER_MINUTE, 60_000),
     }),
   );
 

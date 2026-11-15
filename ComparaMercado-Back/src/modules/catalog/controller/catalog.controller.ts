@@ -56,6 +56,10 @@ export function catalogRoutes({ catalog, compareRateLimiter }: CatalogRoutesDeps
     return c.json({ stores: await catalog.listStores(query) });
   });
 
+  routes.get(apiRoutes.cities, responseCache({ ttlSeconds: STORES_CACHE_SECONDS }), async (c) =>
+    c.json({ cities: await catalog.listCities() }),
+  );
+
   routes.post(apiRoutes.compareList, rateLimitByIp(compareRateLimiter), async (c) => {
     const request = await parseJsonBody(c, CompareListRequestSchema);
     return c.json(await catalog.compareList(request));

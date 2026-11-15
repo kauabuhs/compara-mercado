@@ -1,5 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 import { beforeAll, describe, expect, it } from "vitest";
+import {
+  createConfirmedUser,
+  localUsersConfigFromEnv,
+} from "../../../__tests__/support/local-users";
 import { createApp } from "../../../app";
 import {
   MyContributionsResponseSchema,
@@ -13,16 +17,18 @@ import { createSupabaseServices } from "../../../services";
 import { buildJpeg, containsText, SOS_HEADER, segment, text } from "./jpeg-fixtures";
 
 // Roda contra o Supabase LOCAL (`pnpm db:start`) com RLS e Storage reais. Ignorado sem as variáveis:
-//   SUPABASE_TEST_URL, SUPABASE_TEST_ANON_KEY, SUPABASE_TEST_ADMIN_EMAIL, SUPABASE_TEST_ADMIN_PASSWORD
+//   SUPABASE_TEST_URL, SUPABASE_TEST_ANON_KEY, a chave admin local (cria usuários já confirmados;
+//   ver `local-users.ts`), SUPABASE_TEST_ADMIN_EMAIL, SUPABASE_TEST_ADMIN_PASSWORD
 // ATENÇÃO: este teste ESCREVE. Cria dois usuários descartáveis e um envio (rejeitado no fim, para
 // não mexer em preço público). Observações são imutáveis, então os registros ficam no banco local;
 // nunca aponte para staging/produção.
 const supabaseUrl = process.env["SUPABASE_TEST_URL"];
 const anonKey = process.env["SUPABASE_TEST_ANON_KEY"];
+const usersConfig = localUsersConfigFromEnv();
 const adminEmail = process.env["SUPABASE_TEST_ADMIN_EMAIL"];
 const adminPassword = process.env["SUPABASE_TEST_ADMIN_PASSWORD"];
 
-describe.skipIf(!supabaseUrl || !anonKey || !adminEmail || !adminPassword)(
+describe.skipIf(!supabaseUrl || !anonKey || !usersConfig || !adminEmail || !adminPassword)(
   "contribuição de preço com foto contra o Supabase local",
   // rede real: a primeira chamada ao Storage depois de um tempo parado leva alguns segundos
   { timeout: 30_000 },
@@ -60,13 +66,11 @@ describe.skipIf(!supabaseUrl || !anonKey || !adminEmail || !adminPassword)(
       });
 
     async function signUp(label: string): Promise<string> {
-      const client = createClient(url, key, { auth: { persistSession: false } });
-      const { data, error } = await client.auth.signUp({
-        email: `contrib-${label}-${runId}@test.local`,
-        password: `Senha-${runId}-Forte!`,
-      });
-      if (error || !data.session) throw new Error(`signUp falhou: ${error?.message}`);
-      return data.session.access_token;
+      const user = await createConfirmedUser(
+        usersConfig ?? { url, anonKey: key, serviceRoleKey: "" },
+        `contrib-${label}-${runId}`,
+      );
+      return user.accessToken;
     }
 
     function form(overrides: Record<string, string> = {}, photo: Uint8Array = originalPhoto) {
@@ -232,7 +236,7 @@ describe.skipIf(!supabaseUrl || !anonKey || !adminEmail || !adminPassword)(
       expect(stored.length).toBeLessThan(originalPhoto.length);
     });
 
-    it("Storage: o dono lê a própria foto, mas outros, anônimos e o próprio dono não a alteram", async () => {
+    it("Storage: o dono e a comunidade logada leem a foto; anônimo não lê e ninguém a altera", async () => {
       const { data: sources, error } = await authedClient(tokenA)
         .from("sources")
         .select("file_path")
@@ -244,9 +248,11 @@ describe.skipIf(!supabaseUrl || !anonKey || !adminEmail || !adminPassword)(
       const ownRead = await authedClient(tokenA).storage.from("contributions").download(objectPath);
       expect(ownRead.error).toBeNull();
 
+      // ADR-0010: enquanto a publicação aparece no feed, qualquer pessoa logada lê a foto
+      // (a política `contributions_community_select`); a foto de um envio fora do feed segue privada.
       expect(
         (await authedClient(tokenB).storage.from("contributions").download(objectPath)).error,
-      ).not.toBeNull();
+      ).toBeNull();
       const anonymous = createClient(url, key, { auth: { persistSession: false } });
       expect(
         (await anonymous.storage.from("contributions").download(objectPath)).error,

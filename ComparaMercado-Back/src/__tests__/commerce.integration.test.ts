@@ -70,7 +70,8 @@ describe.skipIf(!url)("persistência comercial (Drizzle) — Postgres real", () 
     pool = createPool(url as string, { max: 20, applicationName: "compara-it" });
     db = createOrmDb(pool);
 
-    const ibge = String(Math.floor(1_000_000 + Math.random() * 8_999_999));
+    // Prefixo 97: nenhum município real do IBGE começa assim (a biblioteca já ocupa 11–53).
+    const ibge = `97${String(Math.floor(Math.random() * 100_000)).padStart(5, "0")}`;
     const [city] = await rows<{ id: string }>(
       db,
       sql`insert into public.cities (ibge_code, name, uf, active) values (${ibge}, ${`Cidade IT ${run}`}, 'RS', true) returning id`,
@@ -100,6 +101,14 @@ describe.skipIf(!url)("persistência comercial (Drizzle) — Postgres real", () 
   }, 60_000);
 
   afterAll(async () => {
+    // Não deixa o mercado de teste ativo: outros testes (e o ambiente local) listam mercados ativos.
+    if (storeId) {
+      await rows(db, sql`update public.stores set status = 'inactive' where id = ${storeId}::uuid`);
+      await rows(
+        db,
+        sql`update public.cities set active = false where name = ${`Cidade IT ${run}`}`,
+      );
+    }
     await pool?.end();
   });
 

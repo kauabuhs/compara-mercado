@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import {
   apiRoutes,
   ManualPriceRequestSchema,
+  ModerationDecisionRequestSchema,
+  ModerationQuerySchema,
   ReviewObservationRequestSchema,
   ReviewQueueQuerySchema,
 } from "../../../contracts";
@@ -60,9 +62,31 @@ export function adminRoutes({ authenticator, adminFor }: AdminRoutesDeps) {
 
   routes.post(apiRoutes.adminReviewObservation(":observationId"), async (c) => {
     const observationId = parseUuidParam(c, "observationId");
-    const { decision } = await parseJsonBody(c, ReviewObservationRequestSchema);
-    const decided = await adminFor(c.get("accessToken")).reviewObservation(observationId, decision);
+    const { decision, note } = await parseJsonBody(c, ReviewObservationRequestSchema);
+    const decided = await adminFor(c.get("accessToken")).reviewObservation(
+      observationId,
+      decision,
+      note,
+    );
     if (!decided) throw errors.notFound("Observação não encontrada ou já revisada.");
+    return c.json({ ok: true });
+  });
+
+  routes.get(apiRoutes.adminModeration, async (c) => {
+    const query = parseQuery(c, ModerationQuerySchema);
+    const { items, total } = await adminFor(c.get("accessToken")).getModerationQueue(query);
+    return c.json({ items, total, page: query.page, pageSize: query.pageSize });
+  });
+
+  routes.post(apiRoutes.adminModerationTask(":taskId"), async (c) => {
+    const taskId = parseUuidParam(c, "taskId");
+    const decision = await parseJsonBody(c, ModerationDecisionRequestSchema);
+    const decided = await adminFor(c.get("accessToken")).resolveModerationTask(
+      taskId,
+      decision,
+      c.get("user").id,
+    );
+    if (!decided) throw errors.notFound("Tarefa não encontrada ou já encerrada.");
     return c.json({ ok: true });
   });
 

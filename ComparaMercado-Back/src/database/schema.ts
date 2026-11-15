@@ -39,8 +39,16 @@ const geography = customType<{ data: string }>({ dataType: () => "geography" });
 
 export const aliasStatus = pgEnum("alias_status", ["pending", "approved", "rejected"]);
 export const allergenPresence = pgEnum("allergen_presence", ["contains", "may_contain"]);
+export const approvalKind = pgEnum("approval_kind", [
+  "admin",
+  "community",
+  "trusted_author",
+  "store",
+  "pipeline",
+]);
 export const attributeValueType = pgEnum("attribute_value_type", ["text", "number", "boolean"]);
 export const baseUnit = pgEnum("base_unit", ["kg", "l", "un"]);
+export const confirmationVerdict = pgEnum("confirmation_verdict", ["confirm", "changed"]);
 export const identifierType = pgEnum("identifier_type", [
   "gtin_alt",
   "sku",
@@ -97,6 +105,20 @@ export const promotionStatus = pgEnum("promotion_status", [
   "cancelled",
 ]);
 export const recordStatus = pgEnum("record_status", ["draft", "active", "archived"]);
+export const reportReason = pgEnum("report_reason", [
+  "wrong_price",
+  "wrong_product",
+  "wrong_store",
+  "spam",
+  "inappropriate_photo",
+  "other",
+]);
+export const reputationEventKind = pgEnum("reputation_event_kind", [
+  "price_approved",
+  "price_rejected",
+  "confirmation_received",
+  "confirmation_given",
+]);
 export const reservationStatus = pgEnum("reservation_status", [
   "active",
   "committed",
@@ -188,6 +210,10 @@ export const cities = pgTable("cities", {
     .default("BR")
     .references((): AnyPgColumn => countries.code),
   regionId: uuid("region_id").references((): AnyPgColumn => regions.id),
+  center: geography("center"),
+  centerLng: doublePrecision("center_lng").generatedAlwaysAs(sql`st_x((center)::geometry)`),
+  centerLat: doublePrecision("center_lat").generatedAlwaysAs(sql`st_y((center)::geometry)`),
+  nameSearch: text("name_search").generatedAlwaysAs(sql`f_unaccent(lower(name))`),
 });
 
 export const stores = pgTable("stores", {
@@ -705,6 +731,8 @@ export const priceObservations = pgTable("price_observations", {
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   reviewedBy: uuid("reviewed_by").references((): AnyPgColumn => profiles.id),
   reviewedAt: timestamp("reviewed_at", { withTimezone: true, mode: "date" }),
+  approvedVia: approvalKind("approved_via"),
+  reviewNote: text("review_note"),
 });
 
 export const currentPrices = pgMaterializedView("current_prices", {
@@ -800,6 +828,12 @@ export const profiles = pgTable("profiles", {
   role: userRole("role").notNull().default("user"),
   reputation: integer("reputation").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  phone: text("phone"),
+  cityId: uuid("city_id").references((): AnyPgColumn => cities.id),
+  termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true, mode: "date" }),
+  termsVersion: text("terms_version"),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  publicNickname: text("public_nickname"),
 });
 
 export const shoppingLists = pgTable("shopping_lists", {
@@ -822,6 +856,7 @@ export const listItems = pgTable("list_items", {
   quantity: integer("quantity").notNull().default(1),
   checked: boolean("checked").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  position: integer("position").notNull().default(0),
 });
 
 export const contributions = pgTable("contributions", {
@@ -857,6 +892,54 @@ export const auditLog = pgTable("audit_log", {
   entityId: text("entity_id"),
   diff: jsonb("diff"),
   at: timestamp("at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});
+
+// ─── Outras ────────────────────────────────────────────────────────────────────
+
+/** chave primária composta: (observation_id, user_id) */
+export const observationConfirmations = pgTable(
+  "observation_confirmations",
+  {
+    observationId: uuid("observation_id")
+      .notNull()
+      .references((): AnyPgColumn => priceObservations.id),
+    userId: uuid("user_id")
+      .notNull()
+      .references((): AnyPgColumn => profiles.id),
+    verdict: confirmationVerdict("verdict").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.observationId, t.userId] })],
+);
+
+/** chave primária composta: (observation_id, user_id) */
+export const observationReports = pgTable(
+  "observation_reports",
+  {
+    observationId: uuid("observation_id")
+      .notNull()
+      .references((): AnyPgColumn => priceObservations.id),
+    userId: uuid("user_id")
+      .notNull()
+      .references((): AnyPgColumn => profiles.id),
+    reason: reportReason("reason").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.observationId, t.userId] })],
+);
+
+export const reputationEvents = pgTable("reputation_events", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  userId: uuid("user_id")
+    .notNull()
+    .references((): AnyPgColumn => profiles.id),
+  observationId: uuid("observation_id")
+    .notNull()
+    .references((): AnyPgColumn => priceObservations.id),
+  kind: reputationEventKind("kind").notNull(),
+  points: integer("points").notNull(),
+  sourceUserId: uuid("source_user_id").references((): AnyPgColumn => profiles.id),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
 
 /** Todas as tabelas: o teste `schema.integration.test.ts` confere cada uma contra o banco real. */
@@ -906,6 +989,9 @@ export const tables = {
   contributions,
   jobRuns,
   auditLog,
+  observationConfirmations,
+  observationReports,
+  reputationEvents,
 } as const;
 /** Views e views materializadas. */
 export const views = { productThumbnails, currentPrices, priceBoard } as const;

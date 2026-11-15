@@ -25,7 +25,8 @@ describe.skipIf(!url || !key)(
     });
 
     it("lista os 6 mercados do seed com coordenadas", async () => {
-      const stores = await listStores(db);
+      // Outros testes de integração (em paralelo) criam mercados próprios: só os do seed contam.
+      const stores = (await listStores(db)).filter((store) => store.name.endsWith("(demo)"));
       expect(stores).toHaveLength(6);
       expect(stores[0]?.lat).toBeLessThan(-29);
       expect(stores[0]?.lng).toBeLessThan(-51);

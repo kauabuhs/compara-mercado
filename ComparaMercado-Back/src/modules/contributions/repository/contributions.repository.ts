@@ -111,9 +111,12 @@ export function createContributionRepository(userDb: Db): ContributionRepository
       const from = pageOffset(page, pageSize);
       const { data, error, count } = await userDb
         .from("price_observations")
-        .select("id,price_cents,promo,status,created_at,stores(name),products(canonical_name)", {
-          count: "exact",
-        })
+        .select(
+          "id,price_cents,promo,status,review_note,created_at,stores(name),products(canonical_name)",
+          {
+            count: "exact",
+          },
+        )
         .eq("created_by", userId)
         .order("created_at", { ascending: false })
         .order("id", { ascending: false })
@@ -129,6 +132,8 @@ export function createContributionRepository(userDb: Db): ContributionRepository
             priceCents: row.price_cents,
             promo: row.promo,
             status: row.status as ContributionStatus,
+            // o motivo só aparece em envio rejeitado (inclusive preço retirado depois de aprovado)
+            reviewNote: row.status === "rejected" ? row.review_note : null,
             createdAt: row.created_at,
           }),
         ),

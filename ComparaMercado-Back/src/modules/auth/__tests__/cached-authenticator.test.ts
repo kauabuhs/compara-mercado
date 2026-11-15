@@ -88,4 +88,20 @@ describe("withAuthCache", () => {
     await expect(cached.authenticate("good")).rejects.toThrow("supabase fora");
     expect(await cached.authenticate("good")).toEqual(admin);
   });
+
+  it("forget descarta só a sessão indicada: a próxima chamada relê o perfil", async () => {
+    const users: Partial<Record<string, SessionUser>> = { a: admin, b: admin };
+    const { inner, authenticate } = buildInner(users);
+    const cached = withAuthCache(inner, { now: () => 0 });
+
+    await cached.authenticate("a");
+    await cached.authenticate("b");
+    users["a"] = { ...admin, displayName: "Novo nome" };
+
+    cached.forget?.("a");
+
+    expect((await cached.authenticate("a"))?.displayName).toBe("Novo nome");
+    expect((await cached.authenticate("b"))?.displayName).toBeNull();
+    expect(authenticate).toHaveBeenCalledTimes(3);
+  });
 });

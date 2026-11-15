@@ -37,9 +37,17 @@ export function withAuthCache(
   const entries = new Map<string, Entry>();
   const inFlight = new Map<string, Promise<SessionUser | null>>();
 
+  const keyOf = (accessToken: string) => createHash("sha256").update(accessToken).digest("hex");
+
   return {
+    forget(accessToken) {
+      const key = keyOf(accessToken);
+      entries.delete(key);
+      inFlight.delete(key);
+    },
+
     async authenticate(accessToken) {
-      const key = createHash("sha256").update(accessToken).digest("hex");
+      const key = keyOf(accessToken);
 
       const cached = entries.get(key);
       if (cached && cached.expiresAt > now()) return cached.user;
