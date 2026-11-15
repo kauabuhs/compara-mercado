@@ -10,7 +10,7 @@ Plano completo: fases 0 a 5 do plano de QA (aprovado em 2026-11-15). Este arquiv
 | -------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | `pnpm check` (lint + arch + tipos + testes)                                | ✅ 305 passando, 87 ignorados (integração sem variáveis)                   |
 | Vitest do Back **com** integração (`SUPABASE_TEST_*`, `DATABASE_URL_TEST`) | ✅ 395 de 395, 0 ignorados                                                 |
-| `pnpm db:test` (pgTAP)                                                     | ✅ 16 arquivos, 430 asserts                                                |
+| `pnpm db:test` (pgTAP)                                                     | ✅ 16 arquivos, 430 asserts (depois da Fase 3: 19 arquivos, 475)           |
 | `pnpm build:back` + `pnpm build:front`                                     | ✅                                                                         |
 | e2e `desktop` (62)                                                         | 🟡 58 ✅ · 2 ❌ (1 flake de corrida, 1 intermitente: QA-003) · 2 ignorados |
 | e2e `mobile` (62)                                                          | 🟡 58 ✅ · 1 ❌ (T-001) · 3 ignorados                                      |
@@ -18,16 +18,16 @@ Plano completo: fases 0 a 5 do plano de QA (aprovado em 2026-11-15). Este arquiv
 
 ## Fase 3 — Bordas de banco e worker
 
-| ID   | Caso                                                                                                 | Resultado                                  |
-| ---- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| B-01 | Excluir usuário que tem preço registrado                                                             | ❌ QA-001 (`17_account_deletion.test.sql`) |
-| B-02 | Excluir usuário sem preços                                                                           | ✅                                         |
-| B-03 | `registerJobs`, filas e agendas do worker                                                            | ⬜                                         |
-| B-04 | `AnthropicVisionProvider` (retry de schema, PDF × imagem)                                            | ⬜                                         |
-| B-05 | SQL da comunidade: P0002/7 dias, tetos 200 e 50 por dia, reputação ≥ 0, "mudou" ×2 em preço aprovado | ⬜                                         |
-| B-06 | Comparação: quantidade somada > 99, overflow de `total_cents`, preço `stale`, produto inativo        | ⬜                                         |
-| B-07 | Orçamento de IA: gasto zera ao reiniciar; modelo fora de `PRICING`                                   | ⬜                                         |
-| B-08 | Upload: foto órfã se o insert falhar; corrida `findOwnSource`/`insertSource`                         | ⬜                                         |
+| ID   | Caso                                                                                                                                                               | Resultado                                                   |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- |
+| B-01 | Excluir usuário que tem preço registrado                                                                                                                           | ❌ QA-001 (`17_account_deletion.test.sql`)                  |
+| B-02 | Excluir usuário sem preços                                                                                                                                         | ✅                                                          |
+| B-03 | `registerJobs`, filas e agendas do worker                                                                                                                          | ✅ `jobs.test.ts` (10 testes)                               |
+| B-04 | `AnthropicVisionProvider` (retry de schema, PDF × imagem, erros retentáveis)                                                                                       | ✅ `anthropic.test.ts` (9 testes)                           |
+| B-05 | SQL da comunidade: expiração, tetos 200 e 50 por dia, 20 pontos por dia, reputação ≥ 0, "mudou" ×2 em preço aprovado, `stores_sync_city_active`, `handle_new_user` | 🟡 QA-009 (`18_community_edges.test.sql`, 27 asserts)       |
+| B-06 | Comparação: quantidade somada > 99, overflow de `total_cents`, preço antigo, produto arquivado, loja inativa                                                       | ❌ QA-006, QA-007 (`19_compare_edges.test.sql`, 13 asserts) |
+| B-07 | Orçamento de IA: gasto zera ao reiniciar; modelo fora de `PRICING` não consome; erro retentável × fatal                                                            | 🟡 documentado em `pipeline.test.ts` (5 testes)             |
+| B-08 | Upload: foto órfã, envio duplo, multipart malformado, 5 MB exatos                                                                                                  | ❌ QA-008 (`it.fails`)                                      |
 
 ## Fase 1.5 / 4 — Admin: CRUD do cadastro-base (`admin-cadastro.spec.ts`, desktop e mobile)
 

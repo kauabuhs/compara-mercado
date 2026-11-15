@@ -719,6 +719,35 @@ describe("contribuição de preços com foto", () => {
     expect((await bodyOf(response)).error.code).toBe("payload_too_large");
   });
 
+  it("foto no limite exato de 5 MB é aceita (QA B-08)", async () => {
+    const { app } = buildTestApp();
+    const exact = new File([new Uint8Array(5 * 1024 * 1024)], "limite.jpg", { type: "image/jpeg" });
+    expect((await send(app, multipart({}, exact))).status).toBe(201);
+  });
+
+  it("multipart malformado ou com 'photo' em texto vira 400, nunca 500", async () => {
+    const { app, contributionService } = buildTestApp({
+      submitRateLimiter: new RateLimiter(100, 60_000),
+    });
+    const garbled = await app.request("/v1/contributions", {
+      method: "POST",
+      headers: { ...bearer("user-token"), "content-type": "multipart/form-data; boundary=xyz" },
+      body: "isto não é multipart",
+    });
+    expect(garbled.status).toBe(400);
+
+    const noBoundary = await app.request("/v1/contributions", {
+      method: "POST",
+      headers: { ...bearer("user-token"), "content-type": "multipart/form-data" },
+      body: "--x",
+    });
+    expect(noBoundary.status).toBe(400);
+
+    const asText = multipart({ photo: "texto-no-lugar-da-foto" }, null);
+    expect((await send(app, asText)).status).toBe(400);
+    expect(contributionService.submit).not.toHaveBeenCalled();
+  });
+
   it("limita envios por usuário (não por IP) com Retry-After", async () => {
     const { app } = buildTestApp({ submitRateLimiter: new RateLimiter(2, 60_000) });
     expect((await send(app, multipart(), "user-token")).status).toBe(201);

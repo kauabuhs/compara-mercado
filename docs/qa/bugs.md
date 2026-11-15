@@ -11,6 +11,10 @@ Severidade: **Bloqueante** (impede lançar) · **Crítico** · **Maior** · **Me
 | QA-003 | Menor      | `POST /v1/shopping-lists/compare`        | `502 data_unavailable` intermitente, sem nova tentativa          | Aberto (intermitente) |
 | QA-004 | Menor      | API (cache) × admin                      | Item arquivado/desativado segue visível por até 60 s             | Aberto                |
 | QA-005 | Menor      | Ambiente                                 | Node 24.14.0 instalado; o projeto exige ≥ 24.22.1                | Aberto                |
+| QA-006 | Maior      | `compare_list` (banco)                   | Produto arquivado pelo admin continua entrando na comparação     | Aberto                |
+| QA-007 | Menor      | `compare_list` (banco)                   | `total_cents` estoura `integer` com quantidades somadas altas    | Aberto                |
+| QA-008 | Menor      | `POST /v1/contributions`                 | Foto rejeitada ou com falha no registro fica órfã no bucket      | Aberto                |
+| QA-009 | Menor      | `evaluate_observation` (banco)           | Dois "mudou" em preço já aprovado não abrem tarefa (a confirmar) | Aberto (a confirmar)  |
 
 ## QA-001 — Excluir conta com preço registrado falha (Bloqueante para LGPD)
 
@@ -49,6 +53,39 @@ Severidade: **Bloqueante** (impede lançar) · **Crítico** · **Maior** · **Me
 ## QA-005 — Versão do Node abaixo da exigida
 
 `.nvmrc` e `engines` pedem Node ≥ 24.22.1; a máquina de teste tem 24.14.0. Nada quebrou, mas o resultado de QA vale para essa versão. Alinhar antes de fechar o relatório final.
+
+## QA-006 — Produto arquivado ainda entra na comparação da lista
+
+- **Esperado:** o diálogo de arquivar diz "O produto sai da busca e das comparações". Um produto arquivado não deveria ter preço comparado.
+- **Obtido:** `compare_list` lê `current_prices`, que não filtra o status do produto (a view só olha `price_observations`). `list_offers_page` filtra `p.status = 'active'`; `compare_list` não. Resultado: quem já tem o produto na lista (no aparelho ou na conta) continua vendo o preço e o total dele, enquanto a busca e as ofertas já o esconderam.
+- **Reproduzir:** `19_compare_edges.test.sql` (asserção 11, `TODO`): arquivar o produto, `refresh materialized view current_prices`, e `compare_list` devolve `total_cents = 500` em vez de nulo.
+- **Direção:** `join products p on p.id = cp.product_id and p.status = 'active'` no CTE `prices` de `compare_list` (nova migração, nunca editar a aplicada) e, no front, avisar quando um item da lista ficou indisponível.
+- **Teste:** `19_compare_edges.test.sql` (retirar o `todo_start`/`todo_end`).
+
+## QA-007 — `total_cents` estoura `integer` na comparação
+
+- **Esperado:** um total grande é devolvido, ou a API recusa a lista com mensagem clara.
+- **Obtido:** `sum(price_cents::bigint * quantity)::integer` falha com `22003 integer out of range` quando o total passa de 2.147.483.647 centavos (R$ 21,4 milhões). O contrato limita cada item a 99 unidades, mas o mesmo produto repetido soma sem teto no SQL (3 × 99 unidades de R$ 100.000,00 já estoura).
+- **Efeito:** na prática exige preço absurdo ou chamada direta à API; o resultado é uma falha (502) e não um total errado. Risco baixo, mas a falha é silenciosa para quem usa.
+- **Reproduzir:** `19_compare_edges.test.sql` (asserções 12 `TODO` e 13, que documenta o `22003` atual).
+- **Direção:** devolver `bigint` (o contrato já usa número do JS) ou limitar a soma por produto a 99 no SQL e no `mergeItems`.
+- **Observação relacionada:** o contrato do lançamento de preço pelo admin aceita até R$ 999.999,99 (`ManualPriceRequestSchema`), mas a coluna `price_observations.price_cents` tem `check` até R$ 100.000,00. Acima disso o banco recusa; falta confirmar se a API devolve mensagem amigável (cobrir em `admin-precos`).
+
+## QA-008 — Foto órfã no bucket `contributions`
+
+- **Esperado:** foto que não virou envio não permanece guardada.
+- **Obtido:** o serviço grava o arquivo **antes** de registrar a fonte e nada o remove se o registro falhar. Isso vale para foto repetida de outra pessoa (hash único, 409), para erro de rede no registro e para o envio duplo do mesmo arquivo (um ganha, o outro deixa o arquivo para trás). O repositório nem tem operação de remover foto.
+- **Efeito:** arquivos de pessoas ficam no armazenamento sem registro que os ligue a alguém, o que pesa para a LGPD e para o custo. Junto com QA-001 (o bucket nunca é limpo ao excluir conta).
+- **Reproduzir:** `contributions.service.test.ts` (`it.fails` "QA-008…", 2 casos). O envio duplo está coberto como caminho feliz da corrida (um vence, o outro recebe 409).
+- **Direção:** `removePhoto(path)` no repositório e `catch` que apaga o arquivo quando a fonte não é criada; job de varredura para arquivos sem `sources`.
+
+## QA-009 — "Mudou" duas vezes em preço já aprovado não gera tarefa (a confirmar)
+
+- **Esperado (ADR-0010):** "≥ 2 vereditos 'mudou' ou ≥ 3 denúncias tiram a publicação do feed e abrem `review_task`".
+- **Obtido:** `evaluate_observation` só age sobre preço **pendente**. Em preço `approved`, dois "mudou" ficam registrados (aparecem na contagem do cartão), mas o preço continua publicado e nenhuma tarefa é criada. Só denúncias (3) abrem tarefa para preço aprovado.
+- **Efeito:** a comunidade sinaliza "o preço mudou" e nada acontece até alguém denunciar. Pode ser intencional (aprovado por admin não deveria cair por voto), por isso fica **a confirmar com o produto**.
+- **Reproduzir:** `18_community_edges.test.sql` (últimas asserções: documentam o comportamento atual).
+- **Direção:** decidir a regra; se for abrir tarefa, tratar `approved` na função de confirmação.
 
 ## Dívida de teste (não é bug do produto)
 

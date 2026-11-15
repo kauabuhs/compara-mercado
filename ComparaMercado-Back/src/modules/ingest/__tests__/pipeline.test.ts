@@ -2,6 +2,11 @@ import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { BudgetGuard } from "../../ai/service/cost";
 import { FakeVisionProvider } from "../../ai/service/fake";
+import {
+  AiProviderError,
+  type ExtractionOutput,
+  type VisionProvider,
+} from "../../ai/service/provider";
 import type { FlyerExtraction } from "../../ai/service/schemas";
 import type { NewObservation, PipelineRepo, SourceRecord, SourceStatus } from "../pipeline.types";
 import type { AliasRecord, CatalogProduct } from "../service/match";
@@ -184,5 +189,96 @@ describe("runPipeline", () => {
     const budget = new BudgetGuard(100, 99);
     await expect(run(repo, [item({})], budget)).rejects.toThrow("budget_exceeded");
     expect(repo.extractions).toBe(0);
+  });
+  describe("orçamento de IA (B-07)", () => {
+    const paid = (model: string): ExtractionOutput => ({
+      data: { storeName: null, periodStart: null, periodEnd: null, items: [] },
+      rawText: "{}",
+      model,
+      promptVersion: "v",
+      usage: { inputTokens: 1_000_000, outputTokens: 0 },
+    });
+    const runWith = (provider: VisionProvider, budget: BudgetGuard, repo: MemoryRepo) =>
+      runPipeline(
+        { repo, visionProvider: provider, budget, log, publishThreshold: 0.9, now: () => NOW },
+        "s1",
+      );
+
+    it("modelo com tabela de preço consome o orçamento", async () => {
+      const budget = new BudgetGuard(10_000);
+      const summary = await runWith(
+        { name: "x", extractFlyer: async () => paid("claude-sonnet-5-5") },
+        budget,
+        new MemoryRepo(source),
+      );
+      expect(summary.costUsdCents).toBe(200);
+      expect(budget.spent).toBe(200);
+    });
+
+    it("modelo FORA da tabela de preço não consome nada (lacuna documentada: gasto invisível)", async () => {
+      const budget = new BudgetGuard(10_000);
+      const summary = await runWith(
+        { name: "x", extractFlyer: async () => paid("claude-modelo-novo-9") },
+        budget,
+        new MemoryRepo(source),
+      );
+      expect(summary.costUsdCents).toBe(0);
+      expect(budget.spent).toBe(0);
+    });
+
+    it("o gasto vive só na instância de BudgetGuard: uma nova (reinício do worker) começa do zero", () => {
+      const before = new BudgetGuard(1_000);
+      before.record(990);
+      expect(before.canSpend(150)).toBe(false);
+      const afterRestart = new BudgetGuard(1_000);
+      expect(afterRestart.canSpend(150)).toBe(true);
+    });
+
+    it("erro retentável do provedor devolve o arquivo para a fila (uploaded); não retentável marca failed", async () => {
+      const retry = new MemoryRepo(source);
+      await expect(
+        runWith(
+          {
+            name: "x",
+            extractFlyer: async () => {
+              throw new AiProviderError("limite", { retryable: true });
+            },
+          },
+          new BudgetGuard(10_000),
+          retry,
+        ),
+      ).rejects.toThrow("limite");
+      expect(retry.statuses.at(-1)).toBe("uploaded");
+
+      const fatal = new MemoryRepo(source);
+      await expect(
+        runWith(
+          {
+            name: "x",
+            extractFlyer: async () => {
+              throw new AiProviderError("recusou", { retryable: false });
+            },
+          },
+          new BudgetGuard(10_000),
+          fatal,
+        ),
+      ).rejects.toThrow("recusou");
+      expect(fatal.statuses.at(-1)).toBe("failed");
+    });
+
+    it("tipo de arquivo não suportado falha antes de chamar a IA", async () => {
+      const repo = new MemoryRepo(source);
+      repo.download = async () => ({ bytes: new Uint8Array([1]), mimeType: "image/gif" });
+      const provider = new FakeVisionProvider({
+        storeName: null,
+        periodStart: null,
+        periodEnd: null,
+        items: [],
+      });
+      await expect(runWith(provider, new BudgetGuard(10_000), repo)).rejects.toThrow(
+        "não suportado",
+      );
+      expect(provider.calls).toHaveLength(0);
+    });
   });
 });

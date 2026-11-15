@@ -185,6 +185,55 @@ describe("envio de preço com foto", () => {
     expect(memory.observations).toHaveLength(1);
   });
 
+  describe("foto órfã no bucket e corrida de envio duplo (QA B-08 / QA-008)", () => {
+    /** Cada chamada de `createService` reinicia o contador; aqui os caminhos precisam ser distintos. */
+    const serviceWithUniquePaths = (memory: ReturnType<typeof createMemoryRepository>) => {
+      let counter = 0;
+      return createContributionService(memory.repository, {
+        now: () => NOW,
+        newId: () => `arq-${++counter}`,
+      });
+    };
+
+    it("envio duplo da mesma foto (duplo clique): um vence, o outro recebe 'já foi enviada'", async () => {
+      const memory = createMemoryRepository();
+      const service = serviceWithUniquePaths(memory);
+      const [first, second] = await Promise.allSettled([
+        service.submit(USER_ID, input()),
+        service.submit(USER_ID, input()),
+      ]);
+      expect(first.status).toBe("fulfilled");
+      expect(second.status).toBe("rejected");
+      expect(((second as PromiseRejectedResult).reason as DomainError).code).toBe(
+        "duplicate_photo",
+      );
+      expect(memory.observations).toHaveLength(1);
+      expect(memory.sources).toHaveLength(1);
+    });
+
+    // Defeito conhecido: o arquivo é gravado ANTES de a fonte ser registrada e nada o remove se o
+    // registro falhar. `it.fails` mantém a suíte verde enquanto o defeito existir e avisa
+    // (falhando) quando for corrigido: aí troque por `it`.
+    it.fails("QA-008: a foto rejeitada como duplicada não fica guardada no bucket", async () => {
+      const memory = createMemoryRepository();
+      const service = serviceWithUniquePaths(memory);
+      await service.submit(OTHER_USER_ID, input());
+      await expect(service.submit(USER_ID, input())).rejects.toBeInstanceOf(DomainError);
+      expect(memory.objects.size).toBe(1);
+    });
+
+    it.fails("QA-008: falha ao registrar a fonte não deixa a foto órfã", async () => {
+      const memory = createMemoryRepository();
+      vi.mocked(memory.repository.insertSource).mockRejectedValueOnce(
+        new DbError("rede caiu", "08006"),
+      );
+      await expect(serviceWithUniquePaths(memory).submit(USER_ID, input())).rejects.toBeInstanceOf(
+        DbError,
+      );
+      expect(memory.objects.size).toBe(0);
+    });
+  });
+
   it("traduz os erros do banco em erros de negócio e repassa os inesperados", async () => {
     const cases: [string, string][] = [
       ["54000", "daily_limit"],
