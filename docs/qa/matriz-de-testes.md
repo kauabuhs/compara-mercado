@@ -49,6 +49,18 @@ Plano completo: fases 0 a 5 do plano de QA (aprovado em 2026-11-15). Este arquiv
 | A-14 | Mercados: cadastrar, editar bairro, inativar (confirmação), filtro Inativos        | ✅        | ✅        |
 | A-15 | As 4 listagens respondem 200 ao admin; as 8 abas existem                           | ✅        | ✅        |
 
+## Fase 4 — Novos specs e2e (executados isoladamente no desktop; mobile e suíte completa pendentes)
+
+| Spec                                | Cobre                                                                                                                                | Resultado               |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------- |
+| `admin-acesso.spec.ts` (7)          | 8 telas do painel como visitante, usuário comum e admin; API 401/403/200; escritas negadas; foto; chave de serviço fora do navegador | ✅ (QA-002 ampliado)    |
+| `admin-precos.spec.ts` (4)          | validação, preço vigente no produto, preço mais novo substitui, teto                                                                 | 🟡 QA-010               |
+| `admin-moderacao.spec.ts` (6)       | rejeitar, aprovar, manter, retirar (some do feed), decisão concorrente                                                               | 🟡 QA-011               |
+| `busca-filtros.spec.ts` (9)         | termo curto/longo, acento, erro de digitação, caracteres especiais, "Com preço", paginação, produto inexistente, histórico, ofertas  | 🟡 QA-012, QA-014       |
+| `conta-perfil.spec.ts` (8)          | nome, apelido (formato, reservado, repetido), telefone, cidade, XSS, reputação                                                       | ✅                      |
+| `contribuir-validacoes.spec.ts` (6) | campos obrigatórios, foto pequena, preço, consentimento, foto repetida                                                               | 🟡 QA-010               |
+| `cidade.spec.ts` (7)                | `/api/cidades`, atalhos, busca, "Em breve", cookie, cidade inválida                                                                  | ❌ QA-013 (`test.fail`) |
+
 ## Ainda sem execução (cobertura do plano)
 
 | Área                                                                                               | Situação                                                                                                     |

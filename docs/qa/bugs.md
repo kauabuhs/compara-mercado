@@ -4,17 +4,22 @@ Atualizado em 2026-11-15. Cada item tem evidência reproduzível. **Nenhum foi c
 
 Severidade: **Bloqueante** (impede lançar) · **Crítico** · **Maior** · **Menor** · **Cosmético**. "Teste" aponta o teste que reproduz ou protege o item.
 
-| ID     | Sev.       | Onde                                     | Resumo                                                           | Status                |
-| ------ | ---------- | ---------------------------------------- | ---------------------------------------------------------------- | --------------------- |
-| QA-001 | Bloqueante | Banco (`price_observations`, `profiles`) | Excluir usuário que tem preço registrado falha                   | Aberto                |
-| QA-002 | Menor      | `/admin` (Front)                         | Usuário comum gera `ApiRequestError 403` não tratado no servidor | Aberto                |
-| QA-003 | Menor      | `POST /v1/shopping-lists/compare`        | `502 data_unavailable` intermitente, sem nova tentativa          | Aberto (intermitente) |
-| QA-004 | Menor      | API (cache) × admin                      | Item arquivado/desativado segue visível por até 60 s             | Aberto                |
-| QA-005 | Menor      | Ambiente                                 | Node 24.14.0 instalado; o projeto exige ≥ 24.22.1                | Aberto                |
-| QA-006 | Maior      | `compare_list` (banco)                   | Produto arquivado pelo admin continua entrando na comparação     | Aberto                |
-| QA-007 | Menor      | `compare_list` (banco)                   | `total_cents` estoura `integer` com quantidades somadas altas    | Aberto                |
-| QA-008 | Menor      | `POST /v1/contributions`                 | Foto rejeitada ou com falha no registro fica órfã no bucket      | Aberto                |
-| QA-009 | Menor      | `evaluate_observation` (banco)           | Dois "mudou" em preço já aprovado não abrem tarefa (a confirmar) | Aberto (a confirmar)  |
+| ID     | Sev.       | Onde                                     | Resumo                                                             | Status                |
+| ------ | ---------- | ---------------------------------------- | ------------------------------------------------------------------ | --------------------- |
+| QA-001 | Bloqueante | Banco (`price_observations`, `profiles`) | Excluir usuário que tem preço registrado falha                     | Aberto                |
+| QA-002 | Menor      | `/admin` (Front)                         | Usuário comum gera `ApiRequestError 403` não tratado no servidor   | Aberto                |
+| QA-003 | Menor      | `POST /v1/shopping-lists/compare`        | `502 data_unavailable` intermitente, sem nova tentativa            | Aberto (intermitente) |
+| QA-004 | Menor      | API (cache) × admin                      | Item arquivado/desativado segue visível por até 60 s               | Aberto                |
+| QA-005 | Menor      | Ambiente                                 | Node 24.14.0 instalado; o projeto exige ≥ 24.22.1                  | Aberto                |
+| QA-006 | Maior      | `compare_list` (banco)                   | Produto arquivado pelo admin continua entrando na comparação       | Aberto                |
+| QA-007 | Menor      | `compare_list` (banco)                   | `total_cents` estoura `integer` com quantidades somadas altas      | Aberto                |
+| QA-008 | Menor      | `POST /v1/contributions`                 | Foto rejeitada ou com falha no registro fica órfã no bucket        | Aberto                |
+| QA-009 | Menor      | `evaluate_observation` (banco)           | Dois "mudou" em preço já aprovado não abrem tarefa (a confirmar)   | Aberto (a confirmar)  |
+| QA-010 | Menor      | Lançar preço e Contribuir                | Valor acima do teto é recusado com mensagem genérica               | Aberto                |
+| QA-011 | Menor      | `/admin/revisao`                         | Decidir envio já decidido por outro admin cai em "Algo deu errado" | Aberto                |
+| QA-012 | Menor      | `/produto/[id]`                          | Produto inexistente responde HTTP 200 (soft 404)                   | Aberto                |
+| QA-013 | Menor      | API de busca                             | Byte nulo (`%00`) na busca vira 502 e registra erro                | Aberto                |
+| QA-014 | Cosmético  | `/busca`                                 | Erro de digitação por letra faltando não acha o produto (`fejao`)  | Aberto (melhoria)     |
 
 ## QA-001 — Excluir conta com preço registrado falha (Bloqueante para LGPD)
 
@@ -28,7 +33,7 @@ Severidade: **Bloqueante** (impede lançar) · **Crítico** · **Maior** · **Me
 ## QA-002 — `/admin` para usuário comum registra erro 403 não tratado
 
 - **Esperado:** o layout redireciona para `/conta?aviso=sem-permissao` sem chamar a API de admin.
-- **Obtido:** a pessoa é redirecionada corretamente, mas o servidor registra `⨯ Error [ApiRequestError]: Acesso restrito a administradores. status: 403` em `src/app/admin/page.tsx`: a página busca o resumo em paralelo à guarda do layout.
+- **Obtido:** a pessoa é redirecionada corretamente, mas o servidor registra `⨯ Error [ApiRequestError]: Acesso restrito a administradores. status: 403`: cada tela do painel (`/admin`, `/admin/cidades`, `/admin/categorias`, `/admin/produtos`, `/admin/mercados`…) busca os próprios dados em paralelo à guarda do layout. O spec `admin-acesso.spec.ts` percorre as 8 telas como usuário comum e o log mostra o erro nas telas de cadastro também.
 - **Efeito:** ruído nos logs (pode esconder erros reais ou disparar alertas falsos quando houver monitoramento) e uma chamada desnecessária. Sem impacto visível para quem usa.
 - **Evidência:** saída `[WebServer]` do e2e `auth.spec.ts › usuário comum não entra no painel e vê o motivo` e `contribuir.spec.ts › usuário comum não entra no painel…`.
 - **Direção:** a página tratar 403 (ou checar o papel antes de buscar).
@@ -86,6 +91,44 @@ Severidade: **Bloqueante** (impede lançar) · **Crítico** · **Maior** · **Me
 - **Efeito:** a comunidade sinaliza "o preço mudou" e nada acontece até alguém denunciar. Pode ser intencional (aprovado por admin não deveria cair por voto), por isso fica **a confirmar com o produto**.
 - **Reproduzir:** `18_community_edges.test.sql` (últimas asserções: documentam o comportamento atual).
 - **Direção:** decidir a regra; se for abrir tarefa, tratar `approved` na função de confirmação.
+
+## QA-010 — Valor acima do teto é recusado com mensagem genérica
+
+- **Esperado:** a pessoa descobre que o valor passou do limite e qual é o limite.
+- **Obtido (admin, lançar preço):** o formulário e o contrato aceitam até R$ 999.999,99 (`ManualPriceRequestSchema`, `pattern` de 6 dígitos), mas a coluna `price_observations.price_cents` tem `check` até R$ 100.000,00. Lançar R$ 100.000,01 devolve "Não foi possível salvar o preço." (R$ 100.000,00 funciona).
+- **Obtido (contribuir):** o campo aceita 6 dígitos, mas a API limita a R$ 10.000,00; R$ 10.000,01 devolve "Não foi possível enviar agora. Tente de novo em instantes.", que sugere falha temporária e convida a repetir. O que a pessoa digitou é preservado (bom).
+- **Direção:** alinhar o contrato e o banco (um só teto, por origem, documentado) e devolver mensagem específica ("O preço máximo é R$ 10.000,00").
+- **Teste:** `admin-precos.spec.ts › teto…` e `contribuir-validacoes.spec.ts › preço…`.
+
+## QA-011 — Fila de revisão: envio já decidido por outro admin derruba a tela
+
+- **Esperado:** como na moderação, tratar o 404 ("outra pessoa já decidiu") e recarregar a fila.
+- **Obtido:** `reviewObservation` lança `Error("falha ao revisar")` em qualquer falha, inclusive 404. A tela cai em `error.tsx` ("Algo deu errado"). `decideModeration` (moderação) trata o 404 corretamente: a comparação mostra a inconsistência.
+- **Efeito:** com dois admins na fila (o caso comum quando a equipe cresce), o segundo clique perde a tela e precisa recarregar. Também vale para queda da API (sem mensagem).
+- **Teste:** `admin-moderacao.spec.ts › fila de revisão: se outra pessoa já decidiu…` (documenta o comportamento atual; trocar a asserção ao corrigir).
+
+## QA-012 — Produto inexistente responde HTTP 200
+
+- **Esperado:** 404 para `/produto/<id inexistente>`.
+- **Obtido:** a página mostra "Página não encontrada", mas o status HTTP é 200 (a resposta já começou a ser enviada por streaming quando `notFound()` roda). Uma rota inexistente (`/rota-que-nao-existe`) responde 404 corretamente.
+- **Efeito:** robôs e links quebrados são tratados como página válida (SEO); sem impacto para a pessoa.
+- **Direção:** validar o produto antes de iniciar o streaming (por exemplo na `generateMetadata`/layout da rota) ou aceitar o comportamento e marcar `noindex`.
+- **Teste:** `busca-filtros.spec.ts › produto: id inválido e inexistente…`.
+
+## QA-013 — Byte nulo na busca vira 502 e registra erro
+
+- **Esperado:** `400` (ou o caractere é ignorado).
+- **Obtido:** `GET /v1/products/search?q=a%00b`, `/v1/offers?q=a%00b` e `/v1/cities/search?q=%00` chegam ao Postgres, que recusa o byte nulo (`unsupported Unicode escape sequence`): a API responde 502 `data_unavailable` e registra erro nível `error`. No Front, `/api/cidades?q=%00` responde 503.
+- **Efeito:** qualquer pessoa gera alertas de erro com uma URL; com monitoramento ligado isso vira ruído ou alarme falso. Sem vazamento nem execução.
+- **Direção:** `.refine` no Zod dos termos de busca (sem caracteres de controle) ou `replace(/\u0000/g, "")` antes de chamar o RPC.
+- **Teste:** `cidade.spec.ts › QA-013…` (`test.fail`: passa a falhar quando for corrigido, aí troque por `test`).
+
+## QA-014 — Busca com letra faltando não acha o produto (melhoria)
+
+- **Esperado:** a tela promete "Tentamos entender mesmo com erro de digitação".
+- **Obtido:** `fijao`, `feijaoo`, `aroz` e `arros` acham o produto; `fejao` (letra faltando em palavra curta) devolve 0 resultados. O limite de similaridade (`word_similarity >= 0.5`) é alto para palavras de 5–6 letras.
+- **Efeito:** quem erra assim vê "Nada encontrado" mesmo o produto existindo. Impacto baixo; melhora medindo com termos reais do beta.
+- **Direção:** testar limite 0,4 ou busca por trigramas + Levenshtein; medir precisão no golden set de buscas.
 
 ## Dívida de teste (não é bug do produto)
 
