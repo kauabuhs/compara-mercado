@@ -35,13 +35,13 @@
     "prepare": "husky"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.6.4",
+    "@biomejs/biome": "^2.6.8",
     "@commitlint/cli": "^21.2.4",
     "@commitlint/config-conventional": "^21.2.4",
     "@types/node": "^24.19.2",
     "husky": "^9.1.7",
-    "supabase": "^3.0.0",
-    "turbo": "^2.11.10",
+    "supabase": "^3.1.0",
+    "turbo": "^2.11.11",
     "typescript": "^7.0.2"
   }
 }
